@@ -1,7 +1,7 @@
 // v0.3 cells against stubbed sources: alerts, atlas, macro, AI.
 import { assertEquals } from "@std/assert";
 import { bootCells } from "aio/testing";
-import { ai } from "../../src/cell/ai.ts";
+import { ai, lastOf } from "../../src/cell/ai.ts";
 import { alerts } from "../../src/cell/alerts.ts";
 import { atlas } from "../../src/cell/atlas.ts";
 import { markets } from "../../src/cell/markets.ts";
@@ -102,32 +102,72 @@ Deno.test("alerts: failure keeps last data and reports", async () => {
   }
 });
 
-Deno.test("ai: models pick a default; summarize stores a note per subject; no model → clear error", async () => {
+const SERVED = { model: "ollama/qwen3:1.7b", name: "qwen3:1.7b", note: "" };
+/** A fake aipro `brief`: streams the given chunks, then answers `r`. */
+const briefOf = (chunks: unknown[], r: unknown) =>
+  async function* (_id: string, msgs: { content: string }[]) {
+    yield* chunks;
+    return typeof r === "function" ? r(msgs) : r;
+  };
+
+Deno.test("ai: aipro up → ready; brief streams, then stores a note per subject (thinking stripped)", async () => {
   await using _ = await bootCells([ai], {
     stub: {
       "../server/ai.server.ts": {
-        models: ok(["qwen3:1.7b", "gemma4:12b"]),
-        chat: (model: string, _sys: string, prompt: string) =>
-          Promise.resolve(`- **${model}** ${prompt.includes("Headlines:\n- A\n- B") ? "ok" : "bad"}`),
+        capabilities: ok([{ task: "text", qualities: ["normal"], now: true, paidOnly: false }]),
+        brief: briefOf(
+          [{ type: "progress", phase: "load", pct: 0.5 }, { type: "delta", text: "<think>hm</think>- " }],
+          (m: { content: string }[]) => ({
+            v: 1,
+            ok: true,
+            id: "x",
+            ms: 1,
+            served: SERVED,
+            output: {
+              kind: "value",
+              value: `<think>hm</think>- ${m[1].content.includes("Headlines:\n- A\n- B") ? "ok" : "bad"}`,
+            },
+          }),
+        ),
       },
     },
   });
-  await ai.refreshModels();
-  assertEquals([ai.model, ai.models.length], ["qwen3:1.7b", 2]);
-  await ai.setModel("gemma4:12b");
+  await ai.check();
+  assertEquals([ai.ready, ai.link.ok], [true, true]);
   await ai.summarize("the world", "world", ["A", "B"]);
-  assertEquals(ai.notes.world.text, "- **gemma4:12b** ok");
-  assertEquals(ai.notes.world.model, "gemma4:12b");
+  assertEquals([ai.notes.world.text, ai.notes.world.model, ai.live], ["- ok", "qwen3:1.7b", null]);
 });
 
-Deno.test("ai: Ollama missing → status explains how to install", async () => {
+Deno.test("ai: aipro off → not ready, clear status; a refusal surfaces its reason", async () => {
   await using _ = await bootCells([ai], {
     stub: {
-      "../server/ai.server.ts": { models: () => Promise.reject(new Error("Ollama is not running")), chat: boom },
+      "../server/ai.server.ts": {
+        capabilities: ok(null),
+        brief: briefOf([], { v: 1, ok: false, kind: "unsupported", reason: "aipro is not running" }),
+      },
     },
   });
-  await ai.refreshModels();
-  assertEquals([ai.modelStatus.ok, ai.model], [false, ""]);
+  await ai.check();
+  assertEquals([ai.ready, ai.link.ok, ai.link.err], [false, false, "aipro is not running"]);
   await ai.summarize("X", "XX", ["h"]);
-  assertEquals(ai.status.err.startsWith("No local model"), true);
+  assertEquals([ai.status.err, ai.notes.XX, ai.live], ["aipro is not running", undefined, null]);
+});
+
+Deno.test("ai: aipro answers map to the Settings status; a dropped link turns AI off", async () => {
+  assertEquals(lastOf({ v: 1, ok: false, kind: "unsupported", reason: "no model" }, 5).kind, "refused");
+  assertEquals(lastOf({ v: 1, ok: false, kind: "busy", reason: "GPU full", retryAfterMs: 9 }, 5).kind, "busy");
+  await using _ = await bootCells([ai], {
+    stub: {
+      "../server/ai.server.ts": {
+        capabilities: ok([{ task: "text", qualities: ["normal"], now: true, paidOnly: false }]),
+        brief: async function* () {
+          yield { type: "delta", text: "- a" };
+          throw new Error("closed");
+        },
+      },
+    },
+  });
+  await ai.check();
+  await ai.summarize("X", "XX", ["h"]);
+  assertEquals([ai.ready, ai.last?.kind, ai.status.err], [false, "failed", "aipro connection lost: closed"]);
 });

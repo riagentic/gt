@@ -98,9 +98,12 @@ export const eonet = (j: any): Hazard[] =>
       lat: n(lat, 999),
       level: 0,
       source: "NASA EONET",
-      url: s(e?.sources?.[0]?.url) || s(e.link),
+      url: readable(s(e?.sources?.[0]?.url) || s(e.link)),
     };
   }).filter((h: Hazard | null): h is Hazard => !!h && !!h.id && ok(h.lon, h.lat));
+
+/** JTWC links its coded `.tcw` bulletin (served as a download); the prose warning sits beside it as `web.txt`. */
+export const readable = (url: string): string => url.replace(/(\/jtwc\/products\/\w+)\.tcw$/, "$1web.txt");
 
 const GDACS_KIND: Record<string, HazardKind> = {
   EQ: "quake",

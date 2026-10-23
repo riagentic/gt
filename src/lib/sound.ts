@@ -1,6 +1,7 @@
 // TV sound carried across channel switches. Pure.
 export type Sound = { muted: boolean; volume: number }; // volume 0–100, YouTube's scale
-export const MUTED: Sound = { muted: true, volume: 100 };
+/** First play of a session: sound on, medium volume. */
+export const START: Sound = { muted: false, volume: 50 };
 /** Console prefix the guest page uses to report its sound to the app. */
 export const TAG = "bwm:sound:";
 
@@ -32,3 +33,11 @@ export const guestScript = (s: Sound): string =>
       console.info(tag + JSON.stringify({ muted: p.isMuted(), volume: p.getVolume() })));
   }, 250);
 })()`;
+
+/** A channel's /live page (its first ~1 MB) → the live video's id when on air and embeddable, else null. The
+ *  canonical link names a video only while live; playability decides whether our embed can show it. We embed that
+ *  video directly: YouTube's "whatever this channel streams" embed says "video unavailable" for many live channels. */
+export const liveVideo = (html: string): string | null => {
+  const id = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1];
+  return id && /"playabilityStatus":\{"status":"OK"/.test(html) && !/"playableInEmbed":false/.test(html) ? id : null;
+};

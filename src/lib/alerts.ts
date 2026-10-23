@@ -68,6 +68,13 @@ export type WeatherAlert = {
 };
 type Poly = GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon, { id: string; severity: number; title: string }>;
 
+/** The forecast page for an alert's first zone (it lists the zone's active hazards); the alert's own URL is API JSON. */
+const nwsPage = (zones: unknown): string => {
+  const all = Array.isArray(zones) ? zones.map(s) : [];
+  const zone = (all.find((z) => z.includes("/forecast/")) ?? all[0] ?? "").split("/").pop();
+  return zone ? `https://forecast.weather.gov/MapClick.php?zoneid=${zone}` : "https://www.weather.gov/alerts";
+};
+
 /** NWS active alerts (Extreme/Severe). One office often issues the same warning for several zones at once:
  *  those merge into one alert (areas joined); every polygon points at the merged id. */
 export function nws(geo: any): { alerts: WeatherAlert[]; polys: Poly[] } {
@@ -90,7 +97,7 @@ export function nws(geo: any): { alerts: WeatherAlert[]; polys: Poly[] } {
         until: Date.parse(s(p.expires)) || 0,
         source: s(p.senderName) || "NWS",
         country: BY_ISO.US,
-        url: s(f.id) || "https://alerts.weather.gov",
+        url: nwsPage(p.affectedZones),
       },
     );
     if (f.geometry) {
@@ -119,7 +126,7 @@ export function eccc(geo: any): { alerts: WeatherAlert[]; polys: Poly[] } {
       until: Date.parse(s(p.expiration_datetime)) || 0,
       source: "Environment Canada",
       country: BY_ISO.CA,
-      url: "https://weather.gc.ca/warnings/index_e.html",
+      url: "https://weather.gc.ca/index_e.html?layers=alert",
     });
     if (f.geometry) {
       polys.push({ type: "Feature", geometry: f.geometry, properties: { id: `eccc-${key}`, severity: 2, title } });

@@ -1,11 +1,15 @@
-// Better World Monitor — entry. Cells self-register on import.
+// Globe Now (gn) — entry. Cells self-register on import.
 import "./cell/prefs.ts";
 import "./cell/view.ts";
 import "./cell/watch.ts";
+import "./cell/tvlive.ts";
+import "./cell/tr.ts";
 import "./server/sources.server.ts"; // embed server-only modules for deno compile
 import "./server/blobs.server.ts";
 import "./server/world.server.ts";
 import "./server/ai.server.ts";
+import "./server/signals.server.ts";
+import "./server/reader.server.ts";
 import { aio } from "aio";
 import { ai } from "./cell/ai.ts";
 import { air } from "./cell/air.ts";
@@ -14,8 +18,10 @@ import { atlas } from "./cell/atlas.ts";
 import { hazards } from "./cell/hazards.ts";
 import { layers } from "./cell/layers.ts";
 import { markets } from "./cell/markets.ts";
+import { meteo } from "./cell/meteo.ts";
 import { news } from "./cell/news.ts";
 import { risk } from "./cell/risk.ts";
+import { signals } from "./cell/signals.ts";
 import { sky } from "./cell/sky.ts";
 
 const MIN = 60_000;
@@ -23,7 +29,7 @@ const MIN = 60_000;
 // aio-ok: single-user local app; every window reads every cell.
 await aio.run({
   ui: {
-    title: "Better World Monitor",
+    title: "Globe Now",
     theme: "tokens",
     head: `<link rel="stylesheet" href="assets/maplibre-gl.css">`,
     chrome: "none",
@@ -42,6 +48,7 @@ await aio.run({
     { id: "sky", every: 6 * 60 * MIN, action: sky.refresh.action(false) },
     { id: "risk", every: 3 * 60 * MIN, action: risk.refresh.action() },
     { id: "macro", every: 60 * MIN, action: markets.refreshMacro.action() },
+    { id: "signals", every: 60 * MIN, action: signals.refresh.action() },
     { id: "weather", every: 10 * MIN, action: alerts.refreshWeather.action() },
     { id: "sirens", every: 2 * MIN, action: alerts.refreshSirens.action() },
     { id: "aviation", every: 2 * MIN, action: alerts.refreshAviation.action() },
@@ -50,6 +57,9 @@ await aio.run({
     { id: "traffic", every: 12 * 60 * MIN, action: atlas.refreshTraffic.action() },
     { id: "planet", every: 3 * 60 * MIN, action: atlas.refreshPlanet.action() },
     { id: "services", every: 5 * MIN, action: atlas.refreshServices.action() },
+    { id: "temps", every: 3 * 60 * MIN, action: meteo.refreshTemps.action() },
+    { id: "storms", every: 60 * MIN, action: meteo.refreshStorms.action() },
+    { id: "aipro", every: MIN / 2, action: ai.check.action() },
   ],
   onStart: () => {
     news.refresh();
@@ -62,6 +72,7 @@ await aio.run({
     sky.refresh(false);
     risk.refresh();
     markets.refreshMacro();
+    signals.refresh();
     alerts.refreshWeather();
     alerts.refreshSirens();
     alerts.refreshAviation();
@@ -70,7 +81,9 @@ await aio.run({
     atlas.refreshTraffic();
     atlas.refreshPlanet();
     atlas.refreshServices();
-    ai.refreshModels();
+    meteo.refreshTemps();
+    meteo.refreshStorms();
+    ai.check();
   },
   // webviewTag: Live TV plays YouTube in a <webview> (see ui/Systems.tsx); no child windows.
   electron: { ignoreDebugEnv: true, strictPin: true, webviewTag: true },

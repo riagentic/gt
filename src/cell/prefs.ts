@@ -37,16 +37,26 @@ export type LayerId =
   | "radiation"
   | "climate"
   | "night"
+  | "rain"
+  | "temps"
+  | "storms"
   | "borders";
 export type Layers = Record<LayerId, boolean>;
+/** Globe; flat Mercator (MapLibre); flat true-size Equal Earth (its own canvas). */
+export type Projection = "globe" | "mercator" | "equal";
+export const PROJECTIONS: Projection[] = ["globe", "mercator", "equal"];
 export type Preset = "world" | "security" | "trade" | "tech" | "planet";
 /** Live TV: last channel, and the floating player (in-app, above everything) when popped out. */
 export type TvState = { channel: string; floating: boolean; rect: Rect };
+/** UI language: fixed text from src/i18n, live text (news …) translated once by aipro (cell `tr`). */
+export type Lang = "en" | "cs";
+export const LANGS: Lang[] = ["en", "cs"];
 export type State = {
+  lang: Lang;
   tv: TvState;
   tab: Tab;
   sidebar: boolean;
-  globe: boolean;
+  projection: Projection;
   theme: "auto" | "dark" | "light";
   layers: Layers;
   /** Layer shown alone, and the mix to restore when it is clicked again. */
@@ -91,7 +101,20 @@ export const LAYERS: LayerInfo[] = [
   { id: "datacenters", label: "Data centers", hint: "Wikidata · sparse, notable sites only", group: "Energy · Tech" },
   { id: "spaceports", label: "Spaceports", hint: "Wikidata · launch sites", group: "Energy · Tech" },
   { id: "radiation", label: "Radiation", hint: "Safecast · live sensors, counts per minute", group: "Planet" },
-  { id: "climate", label: "Temperature anomaly", hint: "NASA POWER · latest 7 days vs 2001–2025", group: "Planet" },
+  { id: "climate", label: "Temperature anomaly", hint: "ERA5 · latest 7 days vs 1991–2020 normal", group: "Planet" },
+  {
+    id: "rain",
+    label: "Rain",
+    hint: "NASA IMERG · satellite rainfall, latest half hour (~5 h behind)",
+    group: "Weather",
+  },
+  { id: "temps", label: "Temperature", hint: "Open-Meteo · current temperature, 10° grid", group: "Weather" },
+  {
+    id: "storms",
+    label: "Tropical cyclones",
+    hint: "GDACS · track, forecast cone and wind zones, every ocean",
+    group: "Weather",
+  },
   { id: "night", label: "Day / night", hint: "Live solar terminator", group: "Planet" },
   { id: "borders", label: "Country activity", hint: "Shade countries by activity score", group: "Planet" },
 ];
@@ -117,7 +140,7 @@ export const PRESETS: Record<Preset, { label: string; layers: Layers; region: St
   tech: { label: "Tech · Space", layers: only("cables", "datacenters", "spaceports", "sats", "night"), region: "tech" },
   planet: {
     label: "Planet",
-    layers: only("quakes", "events", "weather", "health", "radiation", "climate", "night"),
+    layers: only("quakes", "events", "weather", "health", "radiation", "climate", "storms", "rain", "night"),
     region: "all",
   },
 };
@@ -128,10 +151,11 @@ const isRect = (v: unknown) =>
   "a rect {x, y, w, h}";
 
 const INITIAL: State = {
+  lang: "en",
   tv: { channel: "UCNye-wNBqNL5ZzHSJj3l8Bg", floating: false, rect: { x: 480, y: 80, w: 520, h: 330 } },
   tab: "brief",
   sidebar: true,
-  globe: true,
+  projection: "globe",
   theme: "auto",
   layers: PRESETS.world.layers,
   soloed: null,
@@ -142,13 +166,14 @@ const INITIAL: State = {
 };
 
 export const prefs = cell("prefs", {
-  version: 4,
-  // Keep the user's choices; new layers start from the default mix.
+  version: 6,
+  // Keep the user's choices; new layers start from the default mix. v5: `globe` → `projection`. v6: `lang`.
   onMigrate: (s) => {
-    const old = s as Partial<State>;
+    const { globe, ...old } = s as Partial<State> & { globe?: boolean };
     return {
       ...INITIAL,
       ...old,
+      projection: old.projection ?? (globe === false ? "mercator" : "globe"),
       layers: { ...INITIAL.layers, ...old.layers },
       preset: old.preset ?? null,
       tv: { ...INITIAL.tv, ...old.tv },
@@ -168,8 +193,13 @@ export const prefs = cell("prefs", {
     toggleSidebar(s) {
       s.sidebar = !s.sidebar;
     },
-    setGlobe(s, on: boolean) {
-      s.globe = on;
+    setProjection(s, p: Projection) {
+      if (!PROJECTIONS.includes(p)) throw new Error(`no projection ${p}`);
+      s.projection = p;
+    },
+    setLang(s, lang: Lang) {
+      if (!LANGS.includes(lang)) throw new Error(`no language ${lang}`);
+      s.lang = lang;
     },
     setTheme(s, theme: State["theme"]) {
       s.theme = theme;
@@ -195,7 +225,7 @@ export const prefs = cell("prefs", {
       [s.layers, s.region, s.preset, s.soloed, s.saved] = [{ ...PRESETS[p].layers }, PRESETS[p].region, p, null, null];
     },
     setChannel(s, channel: string) {
-      if (!/^UC[\w-]{22}$/.test(channel)) throw new Error(`not a YouTube channel id: ${channel}`);
+      if (!/^(UC[\w-]{22}|web:[a-z]+)$/.test(channel)) throw new Error(`not a channel id: ${channel}`);
       s.tv.channel = channel;
     },
     /** Pop the TV out into the floating player at `rect` (already fitted to the window by the caller). */

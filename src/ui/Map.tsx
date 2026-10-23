@@ -13,8 +13,12 @@ import { risk } from "../cell/risk.ts";
 import { sky } from "../cell/sky.ts";
 import { type LayerId, prefs } from "../cell/prefs.ts";
 import { type Pick, view } from "../cell/view.ts";
+import { C, L, T } from "./i18n.ts";
+import { focus } from "./rows.tsx";
 import { THREATS } from "../lib/alerts.ts";
 import * as F from "../lib/features.ts";
+import * as M from "../lib/meteo.ts";
+import { meteo } from "../cell/meteo.ts";
 import { position, track } from "../lib/orbit.ts";
 import { mainBounds } from "../lib/geo.ts";
 import { nightPolygon } from "../lib/sun.ts";
@@ -35,6 +39,8 @@ const SOURCES = [
   "cables",
   "infra",
   "climate",
+  "temps-pts",
+  "storms",
   "radiation",
   "places",
   "traffic",
@@ -97,7 +103,38 @@ const GROUPS: Record<LayerId, string[]> = {
   datacenters: ["datacenters"],
   radiation: ["radiation"],
   climate: ["climate", "climate-label"],
+  rain: ["rain"],
+  temps: ["temps-img", "temps-label"],
+  storms: ["storms-wind", "storms-cone", "storms-cone-line", "storms-track"],
 };
+/** NASA GIBS IMERG 30-min rain rate; "default" = the latest half hour. `b` busts the tile cache each half hour. */
+const rainTiles = (bucket: number) => [
+  `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/IMERG_Precipitation_Rate_30min/default/default/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png?b=${bucket}`,
+];
+const MERC_LAT = 85.051129;
+const TEMP_CORNERS: [[number, number], [number, number], [number, number], [number, number]] = [
+  [-180, MERC_LAT],
+  [180, MERC_LAT],
+  [180, -MERC_LAT],
+  [-180, -MERC_LAT],
+];
+/** The temperature grid as a smooth image in Mercator rows (an image source is stretched linearly in Mercator). */
+function tempImage(t: (number | null)[]): string {
+  const W = 360, H = 360, c = document.createElement("canvas");
+  [c.width, c.height] = [W, H];
+  const g = c.getContext("2d")!, img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    const lat = new maplibregl.MercatorCoordinate(0, (y + 0.5) / H).toLngLat().lat;
+    for (let x = 0; x < W; x++) {
+      const v = M.sample(t, lat, -180 + ((x + 0.5) * 360) / W), i = (y * W + x) * 4;
+      if (v === null) continue;
+      const [r, gg, b] = M.tempColor(v);
+      [img.data[i], img.data[i + 1], img.data[i + 2], img.data[i + 3]] = [r, gg, b, 255];
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c.toDataURL();
+}
 const SITES = { ports: "port", bases: "base", nuclear: "nuclear", spaceports: "spaceport", datacenters: "datacenter" };
 const SITE_COLOR: Record<string, string> = {
   ports: "#5ac8fa",
@@ -129,6 +166,8 @@ const CLICKABLE = [
   "ports",
   "weather-fill",
 ];
+/** Layers whose hover titles are live feed text (translated once by aipro when the UI is not English). */
+const LIVE = new Set(["sirens", "quakes", "events", "weather-pts", "weather-fill", "protests"]);
 const KIND_OF: Record<string, Pick["kind"]> = {
   squawks: "plane",
   sirens: "siren",
@@ -194,7 +233,8 @@ const SAT_COLOR = [
 ];
 
 function planeIcon(): ImageData {
-  const c = new OffscreenCanvas(32, 32), g = c.getContext("2d")!;
+  // CPU-backed: a GPU canvas would stall the page reading the pixels back (~0.5 s on software GL).
+  const c = new OffscreenCanvas(32, 32), g = c.getContext("2d", { willReadFrequently: true })!;
   g.fillStyle = "#fff";
   g.beginPath();
   g.moveTo(16, 2), g.lineTo(19, 12), g.lineTo(30, 18), g.lineTo(30, 21), g.lineTo(19, 18), g.lineTo(18, 26);
@@ -204,7 +244,12 @@ function planeIcon(): ImageData {
   return g.getImageData(0, 0, 32, 32);
 }
 
-function install(map: maplibregl.Map, data: Map<Src, GeoJSON.FeatureCollection>, dark: boolean): void {
+function install(
+  map: maplibregl.Map,
+  data: Map<Src, GeoJSON.FeatureCollection>,
+  dark: boolean,
+  extra: { temps: string },
+): void {
   for (const id of SOURCES) {
     if (!map.getSource(id)) {
       map.addSource(id, {
@@ -215,6 +260,18 @@ function install(map: maplibregl.Map, data: Map<Src, GeoJSON.FeatureCollection>,
     }
   }
   if (!map.hasImage("plane")) map.addImage("plane", planeIcon(), { sdf: true });
+  if (!map.getSource("rain")) {
+    map.addSource("rain", {
+      type: "raster",
+      tiles: rainTiles(Math.floor(Date.now() / 1_800_000)),
+      tileSize: 256,
+      maxzoom: 6,
+      attribution: "Rain: NASA GIBS / IMERG",
+    });
+  }
+  if (!map.getSource("temps-img") && extra.temps) {
+    map.addSource("temps-img", { type: "image", url: extra.temps, coordinates: TEMP_CORNERS });
+  }
   const below = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
   const ink = dark ? "#0b0d10" : "#ffffff";
   const add = (l: maplibregl.LayerSpecification, under?: string) => map.getLayer(l.id) || map.addLayer(l, under);
@@ -255,6 +312,65 @@ function install(map: maplibregl.Map, data: Map<Src, GeoJSON.FeatureCollection>,
       "line-opacity": ["case", [">=", ["coalesce", ["feature-state", "adv"], 0], 3], 0.9, 0],
     },
   }, below);
+  map.getSource("temps-img") && add({
+    id: "temps-img",
+    type: "raster",
+    source: "temps-img",
+    paint: { "raster-opacity": 0.45, "raster-fade-duration": 0 },
+  }, "countries-fill"); // just above the base map, under every overlay
+  add({ id: "rain", type: "raster", source: "rain", paint: { "raster-opacity": 0.85 } }, "countries-fill");
+  add({
+    id: "storms-wind",
+    type: "fill",
+    source: "storms",
+    filter: ["==", ["get", "part"], "wind"],
+    paint: {
+      "fill-color": ["step", ["get", "kmh"], "#ffd60a", 90, "#ff9f0a", 120, "#ff2d55"],
+      "fill-opacity": 0.2,
+    },
+  }, below);
+  add({
+    id: "storms-cone",
+    type: "fill",
+    source: "storms",
+    filter: ["==", ["get", "part"], "cone"],
+    paint: { "fill-color": dark ? "#ffffff" : "#1d1d1f", "fill-opacity": 0.08 },
+  }, below);
+  add({
+    id: "storms-cone-line",
+    type: "line",
+    source: "storms",
+    filter: ["==", ["get", "part"], "cone"],
+    paint: {
+      "line-color": dark ? "#ffffff" : "#1d1d1f",
+      "line-opacity": 0.6,
+      "line-width": 1,
+      "line-dasharray": [3, 2],
+    },
+  }, below);
+  add({
+    id: "storms-track",
+    type: "line",
+    source: "storms",
+    filter: ["==", ["get", "part"], "track"],
+    paint: {
+      "line-color": ["match", ["get", "cat"], "HU", "#ff2d55", "TS", "#ffd60a", "#64d2ff"],
+      "line-width": 2,
+    },
+  });
+  add({
+    id: "temps-label",
+    type: "symbol",
+    source: "temps-pts",
+    minzoom: 2.5,
+    layout: {
+      "text-field": ["get", "label"],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 10,
+      "text-allow-overlap": true,
+    },
+    paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0,0,0,0.55)", "text-halo-width": 1 },
+  });
   add({
     id: "jam",
     type: "fill",
@@ -618,16 +734,20 @@ function install(map: maplibregl.Map, data: Map<Src, GeoJSON.FeatureCollection>,
   });
 }
 
-/** Zoom-out limits, from the canvas height h. Flat: the world is 512·2^z px tall; the old floor was "world fills h",
- *  allow half again as far (in zoom levels). Globe: diameter 512·2^z/π px; stop when it spans ~55% of h. */
-const minZoom = (globe: boolean, h: number) => globe ? Math.log2((0.55 * Math.PI * h) / 512) : Math.log2(h / 512) / 2;
-const limits = (map: maplibregl.Map, globe: boolean) => (c: maplibregl.LngLat, zoom: number) => ({
-  center: new maplibregl.LngLat(
-    globe ? c.wrap().lng : Math.max(-180, Math.min(180, c.lng)),
-    Math.max(globe ? -85 : -80, Math.min(globe ? 85 : 80, c.lat)),
-  ),
-  zoom: Math.max(minZoom(globe, map.getContainer().clientHeight), zoom),
-});
+/** Zoom-out limits, from the canvas height h. Flat: the world is 512·2^z px tall, so it may never be shorter than the
+ *  canvas, and the center stays far enough from the poles that no blank band shows; sideways it repeats (world copies).
+ *  Globe: diameter 512·2^z/π px; stop when it spans ~55% of h. */
+const minZoom = (globe: boolean, h: number) => Math.log2(((globe ? 0.55 * Math.PI : 1) * h) / 512);
+const limits = (map: maplibregl.Map, globe: boolean) => (c: maplibregl.LngLat, zoom: number) => {
+  const h = map.getContainer().clientHeight, z = Math.max(minZoom(globe, h), zoom);
+  if (globe) return { center: new maplibregl.LngLat(c.wrap().lng, Math.max(-85, Math.min(85, c.lat))), zoom: z };
+  const half = h / (2 * 512 * 2 ** z); // half the canvas height, as a fraction of the world's height
+  const y = Math.max(half, Math.min(1 - half, maplibregl.MercatorCoordinate.fromLngLat(c).y));
+  return {
+    center: new maplibregl.LngLat(c.wrap().lng, new maplibregl.MercatorCoordinate(0, y).toLngLat().lat),
+    zoom: z,
+  };
+};
 
 export function MapView(): JSX.Element {
   const host = useRef<HTMLDivElement>(null!);
@@ -635,8 +755,14 @@ export function MapView(): JSX.Element {
   onMount(() => {
     const data = new Map<Src, GeoJSON.FeatureCollection>();
     let dark = isDark.peek();
-    if (!document.createElement("canvas").getContext("webgl2")) {
-      host.current.innerHTML = `<p class="nogl">This map needs WebGL 2. Enable hardware acceleration and restart.</p>`;
+    const gl = document.createElement("canvas").getContext("webgl2");
+    const info = gl?.getExtension("WEBGL_debug_renderer_info");
+    // Software GL (SwiftShader/llvmpipe) makes every map frame slow: say which renderer we got, once.
+    if (gl && info) console.info("[map] WebGL renderer:", gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
+    if (!gl) {
+      host.current.innerHTML = `<p class="nogl">${
+        L("This map needs WebGL 2. Enable hardware acceleration and restart.")
+      }</p>`;
       return;
     }
     const map = new maplibregl.Map({
@@ -660,6 +786,8 @@ export function MapView(): JSX.Element {
     let advised: number[] = [];
     let jamUrl = "";
     let weatherUrl = "";
+    let stormsUrl = "";
+    const extra = { temps: "" };
     /** Fetch a GeoJSON URL into a source once it is both set and visible; refetch when the URL changes. */
     const lazy = (src: Src, url: string, on: boolean, last: () => string, keep: (u: string) => void) => {
       if (!url || !on || url === last()) return;
@@ -710,9 +838,12 @@ export function MapView(): JSX.Element {
       );
     };
     const applyProjection = () => {
-      if (!ready) return;
-      map.setProjection({ type: prefs.globe ? "globe" : "mercator" });
-      map.setTransformConstrain(limits(map, prefs.globe));
+      if (!ready || prefs.projection === "equal") return; // Equal Earth is its own canvas (EqualMap)
+      const globe = prefs.projection === "globe";
+      map.resize(); // it was hidden while Equal Earth showed
+      map.setProjection({ type: globe ? "globe" : "mercator" });
+      map.setRenderWorldCopies(!globe);
+      map.setTransformConstrain(limits(map, globe));
       map.setSky({
         "sky-color": dark ? "#0b0d10" : "#eef1f5",
         "horizon-color": dark ? "#1d3557" : "#bcd4f0",
@@ -721,8 +852,13 @@ export function MapView(): JSX.Element {
     };
 
     map.on("error", (e) => console.error("[map]", e.error?.message ?? e));
+    // The base styles name a few POI icons (circle-11 …) their sprite lacks: an empty image keeps the console quiet.
+    map.on(
+      "styleimagemissing",
+      (e) => map.hasImage(e.id) || map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) }),
+    );
     map.on("style.load", () => {
-      install(map, data, dark);
+      install(map, data, dark, extra);
       ready = true;
       applyProjection();
       applyLayers();
@@ -761,6 +897,27 @@ export function MapView(): JSX.Element {
       lazy("weather", alerts.weatherUrl, on, () => weatherUrl, (u) => (weatherUrl = u));
     });
     watch(() => put("weather-pts", F.weatherPoints(alerts.weather)));
+    watch(() => {
+      const on = prefs.layers.storms;
+      lazy("storms", meteo.stormsUrl, on, () => stormsUrl, (u) => (stormsUrl = u));
+    });
+    watch(() => {
+      const t = meteo.temps;
+      if (!t || !prefs.layers.temps) return; // built on demand: the image costs a pass over 130k pixels
+      put("temps-pts", M.tempPoints(t.t));
+      extra.temps = tempImage(t.t);
+      const src = map.getSource("temps-img") as maplibregl.ImageSource | undefined;
+      if (src) src.updateImage({ url: extra.temps, coordinates: TEMP_CORNERS });
+      else if (ready) install(map, data, dark, extra), applyLayers(); // first image: add its source + layer
+    });
+    // New rain frame every half hour: swap the tile URL (the "latest" time keeps its URL, so bust the cache).
+    let rainBucket = Math.floor(Date.now() / 1_800_000);
+    watch(() => {
+      const b = Math.floor(now.value / 1_800_000);
+      if (b === rainBucket || !ready) return;
+      rainBucket = b;
+      (map.getSource("rain") as maplibregl.RasterTileSource | undefined)?.setTiles(rainTiles(b));
+    });
     watch(() => put("sirens", F.sirenPoints(alerts.sirens, now.value, (t) => THREATS[t] ?? "Alert")));
     watch(() => put("protests", F.protestPoints(alerts.protests)));
     watch(() => put("squawks", F.squawkPoints(alerts.squawks)));
@@ -806,7 +963,7 @@ export function MapView(): JSX.Element {
       return () => clearInterval(id);
     });
     watch(() => (prefs.layers, applyLayers()));
-    watch(() => (prefs.globe, applyProjection()));
+    watch(() => (prefs.projection, applyProjection()));
     watch(() => applyPick(view.pick));
     // Camera: every select centers the picked thing in the free space between the panels and zooms to fit it.
     // One controller, so the panel-padding ease below can't cancel a flight in progress.
@@ -883,12 +1040,14 @@ export function MapView(): JSX.Element {
       map.getCanvas().style.cursor = f || c ? "pointer" : "";
       const label = f
         ? (f.layer.id === "news"
-          ? `${f.properties.n} stories`
+          ? L("{n} stories", { n: f.properties.n })
           : f.layer.id === "health"
-          ? `Outbreak · ${f.properties.title}`
+          ? L("Outbreak · {title}", { title: T(String(f.properties.title ?? "")) })
+          : LIVE.has(f.layer.id)
+          ? T(String(f.properties.title ?? ""))
           : String(f.properties.title ?? ""))
         : c
-        ? String(c.properties.name)
+        ? C(String(c.properties.name), String(c.properties.iso))
         : "";
       if (label) tip.setLngLat(e.lngLat).setText(label).addTo(map);
       else tip.remove();
@@ -907,7 +1066,7 @@ export function MapView(): JSX.Element {
         : c
         ? { kind: "country", id: Number(c.id) }
         : null;
-      view.select(pick);
+      focus(pick);
     });
 
     onCleanup(() => {
@@ -916,5 +1075,6 @@ export function MapView(): JSX.Element {
     });
   });
 
-  return <div ref={host} class="map" aria-label="World map" />;
+  // Hidden, not unmounted, under the true-size map: switching back is instant and keeps the camera.
+  return <div ref={host} class={prefs.projection === "equal" ? "map off" : "map"} aria-label={L("World map")} />;
 }

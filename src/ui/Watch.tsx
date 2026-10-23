@@ -5,6 +5,7 @@ import { watch } from "../cell/watch.ts";
 import { Empty, Head } from "./bits.tsx";
 import { Icon } from "./icons.tsx";
 import { StoryRow } from "./rows.tsx";
+import { L } from "./i18n.ts";
 import { matches } from "./store.ts";
 
 export function Watch(): JSX.Element {
@@ -17,13 +18,13 @@ export function Watch(): JSX.Element {
   };
   return (
     <div class="panel">
-      <Head title="Watch" />
+      <Head title={L("Watch")} />
       <div class="filters">
         <form class="search add" onSubmit={add}>
           <Icon name="plus" size={14} />
           <input
-            aria-label="Add keyword"
-            placeholder="Add keyword, e.g. Taiwan"
+            aria-label={L("Add keyword")}
+            placeholder={L("Add keyword, e.g. Taiwan")}
             value={draft}
             maxLength={60}
             onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
@@ -38,7 +39,7 @@ export function Watch(): JSX.Element {
                 <button
                   type="button"
                   t={`unwatch_${w.replace(/\W+/g, "_")}`}
-                  aria-label={`Stop watching ${w}`}
+                  aria-label={L("Stop watching {w}", { w })}
                   onClick={() => watch.remove(w)}
                 >
                   <Icon name="close" size={11} />
@@ -51,13 +52,13 @@ export function Watch(): JSX.Element {
       <section>
         <label class="toggle">
           <span class="toggle-text">
-            <span>Desktop alerts</span>
-            <small>New stories for your keywords, red disaster alerts, M6.5+ earthquakes</small>
+            <span>{L("Desktop alerts")}</span>
+            <small>{L("New stories for your keywords, red disaster alerts, M6.5+ earthquakes")}</small>
           </span>
           <input
             type="checkbox"
             role="switch"
-            aria-label="Desktop alerts"
+            aria-label={L("Desktop alerts")}
             checked={watch.alerts}
             onChange={(e) => watch.setAlerts((e.target as HTMLInputElement).checked)}
           />
@@ -65,13 +66,13 @@ export function Watch(): JSX.Element {
       </section>
       <section>
         <h3>
-          Matching stories <span class="count">{hits.length}</span>
+          {L("Matching stories")} <span class="count">{hits.length}</span>
         </h3>
         {watch.words.length === 0 && (
-          <Empty text="Add keywords to follow countries, people, companies or topics across every feed." />
+          <Empty text={L("Add keywords to follow countries, people, companies or topics across every feed.")} />
         )}
         {watch.words.length > 0 && hits.length === 0 && (
-          <Empty text="No current stories match. You'll be notified when one appears." />
+          <Empty text={L("No current stories match. You'll be notified when one appears.")} />
         )}
         {hits.slice(0, 150).map(({ s }) => <StoryRow key={s.id} s={s} />)}
       </section>

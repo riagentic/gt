@@ -1,4 +1,4 @@
-# Better World Monitor
+# Globe Now (gn)
 
 A local desktop dashboard of what is happening in the world: news, disasters, severe weather, sirens, protests,
 aircraft, ship traffic, infrastructure, markets and prediction odds on one WebGL globe, plus live TV and local AI
@@ -7,7 +7,7 @@ briefs. Free, keyless, no account, no backend.
 ## Run
 
     deno task dev                      # Electron window, live reload
-    deno task compile                  # → dist/better-world-monitor-<ver>-x86_64.AppImage
+    deno task compile                  # → dist/globe-now-<ver>-x86_64.AppImage
     deno task test                     # 51 tests: pure libs, every cell method, UI flows, WASM
     deno task infra                    # rebuild assets/infra.geojson + lanes.geojson (Wikidata, NGA WPI)
 
@@ -26,7 +26,7 @@ briefs. Free, keyless, no account, no backend.
 ## Sources (all keyless)
 
 - News: 55 RSS feeds (incl. tech, Reddit, Hacker News, good news) · GDELT protests
-- Hazards: USGS · NASA EONET · GDACS · NWS · Environment Canada · WMO · WHO · Safecast · NASA POWER · NOAA CO₂ ·
+- Hazards: USGS · NASA EONET · GDACS · NWS · Environment Canada · WMO · WHO · Safecast · Open-Meteo ERA5 · NOAA CO₂ ·
   ReliefWeb · ECDC
 - Security: adsb.lol (military, squawk 7500/7600/7700) · FAA airport status · Tzeva Adom sirens · gpsjam.org · CelesTrak
   · US State Dept advisories
@@ -36,4 +36,4 @@ briefs. Free, keyless, no account, no backend.
 - Baked map data: Wikidata (CC0) bases, nuclear plants, spaceports, data centers · NGA World Port Index ·
   newzealandpaul/Shipping-Lanes (CC BY 4.0) · Natural Earth
 - Live TV: YouTube embeds in a `<webview>` (an `aio://` page sends no Referer; YouTube refuses with error 153)
-- AI briefs: local [Ollama](https://ollama.com) only; nothing leaves the machine
+- AI briefs: through aipro, the local AI provider app (aio `peer`); nothing leaves the machine.

@@ -12,6 +12,7 @@ import { COUNTRIES } from "../data/countries.ts";
 import { SQUAWKS, THREATS } from "../lib/alerts.ts";
 import { Empty, Fresh, Head } from "./bits.tsx";
 import { EventRow, MIN, PickRow, QuakeRow, ShowOnMap } from "./rows.tsx";
+import { C, L, T } from "./i18n.ts";
 import { now } from "./store.ts";
 
 /** A titled list section with a count, freshness, "show on map" and "show all". */
@@ -42,7 +43,7 @@ export function Block<T>(props: {
       {props.rows.slice(0, all ? 150 : first).map(props.row)}
       {props.rows.length > first && (
         <button type="button" class="link" onClick={() => setAll(!all)}>
-          {all ? "Show fewer" : `Show all ${props.rows.length}`}
+          {all ? L("Show fewer") : L("Show all {n}", { n: props.rows.length })}
         </button>
       )}
     </section>
@@ -56,16 +57,16 @@ export function Events(): JSX.Element {
   const sirens = alerts.sirens.filter((x) => now.value - x.at < DAY);
   return (
     <div class="panel">
-      <Head title="Events">
+      <Head title={L("Events")}>
         <Fresh s={hazards.status} stale={15 * MIN} />
       </Head>
       <Block
-        title="Earthquakes"
+        title={L("Earthquakes")}
         rows={quakes}
         row={(q) => <QuakeRow key={q.id} q={q} />}
-        empty="No earthquakes at this magnitude."
+        empty={L("No earthquakes at this magnitude.")}
         aside={
-          <span class="seg" role="group" aria-label="Minimum magnitude">
+          <span class="seg" role="group" aria-label={L("Minimum magnitude")}>
             {[2.5, 4.5, 6].map((m) => (
               <button
                 type="button"
@@ -79,34 +80,37 @@ export function Events(): JSX.Element {
           </span>
         }
       />
-      <Block title="Disasters" rows={hazards.events} row={(e) => <EventRow key={e.id} e={e} />} first={8} />
+      <Block title={L("Disasters")} rows={hazards.events} row={(e) => <EventRow key={e.id} e={e} />} first={8} />
       <Block
-        title="Severe weather"
+        title={L("Severe weather")}
         rows={alerts.weather}
         layer="weather"
         fresh={<Fresh s={alerts.weatherStatus} stale={30 * MIN} />}
-        empty="No severe or extreme warnings."
+        empty={L("No severe or extreme warnings.")}
         row={(w) => (
           <PickRow
             key={w.id}
             pick={{ kind: "weather", id: w.id }}
-            title={`${w.title} · ${w.area.split(/[;,:]/)[0] || COUNTRIES[w.country]?.name || ""}`}
+            title={`${T(w.title)} · ${
+              w.area.split(/[;,:]/)[0] ||
+              (COUNTRIES[w.country] ? C(COUNTRIES[w.country].name, COUNTRIES[w.country].iso) : "")
+            }`}
             at={w.at}
-            lead={<span class={`lvl lv${w.severity === 1 ? 4 : 3}`}>{w.severity === 1 ? "EXT" : "SEV"}</span>}
+            lead={<span class={`lvl lv${w.severity === 1 ? 4 : 3}`}>{w.severity === 1 ? L("EXT") : L("SEV")}</span>}
           />
         )}
       />
       <Block
-        title="Israel sirens · 24h"
+        title={L("Israel sirens · 24h")}
         rows={sirens}
         layer="sirens"
         fresh={<Fresh s={alerts.sirenStatus} stale={6 * MIN} />}
-        empty="No sirens in the last 24 hours."
+        empty={L("No sirens in the last 24 hours.")}
         row={(x) => (
           <PickRow
             key={x.id}
             pick={{ kind: "siren", id: x.id }}
-            title={`${THREATS[x.threat] ?? "Alert"} · ${x.cities.slice(0, 3).map((c) => c.en).join(", ")}${
+            title={`${L(THREATS[x.threat] ?? "Alert")} · ${x.cities.slice(0, 3).map((c) => c.en).join(", ")}${
               x.cities.length > 3 ? ` +${x.cities.length - 3}` : ""
             }`}
             at={x.at}
@@ -115,35 +119,37 @@ export function Events(): JSX.Element {
         )}
       />
       <Block
-        title="Aircraft emergencies"
+        title={L("Aircraft emergencies")}
         rows={alerts.squawks}
         layer="squawks"
         fresh={<Fresh s={alerts.aviationStatus} stale={6 * MIN} />}
-        empty="No aircraft squawking 7500, 7600 or 7700."
+        empty={L("No aircraft squawking 7500, 7600 or 7700.")}
         row={(a) => (
           <PickRow
             key={a.hex}
             pick={{ kind: "plane", id: a.hex }}
-            title={`${SQUAWKS[a.sq] ?? a.sq} · ${a.call || a.hex.toUpperCase()}${a.type ? ` · ${a.type}` : ""}`}
+            title={`${SQUAWKS[a.sq] ? L(SQUAWKS[a.sq]) : a.sq} · ${a.call || a.hex.toUpperCase()}${
+              a.type ? ` · ${a.type}` : ""
+            }`}
             lead={<span class="lvl lv4">{a.sq}</span>}
-            aside={<small class="muted">{a.alt ? `${Math.round(a.alt / 100) * 100} ft` : "ground"}</small>}
+            aside={<small class="muted">{a.alt ? `${Math.round(a.alt / 100) * 100} ft` : L("ground")}</small>}
           />
         )}
       />
       <Block
-        title="US airport delays"
+        title={L("US airport delays")}
         rows={alerts.airports}
-        empty="No FAA ground stops or delays."
+        empty={L("No FAA ground stops or delays.")}
         row={(x) => (
           <div key={`${x.code}-${x.kind}`} class="row compact static">
             <span class={`lvl ${x.kind === "Ground stop" || x.kind === "Closure" ? "lv4" : "lv3"}`}>{x.code}</span>
-            <span class="row-title one" title={x.detail}>{x.kind} · {x.reason}</span>
+            <span class="row-title one" title={x.detail}>{L(x.kind)} · {T(x.reason)}</span>
             <small class="muted one">{x.detail}</small>
           </div>
         )}
       />
       <Block
-        title="Protests · 24h"
+        title={L("Protests · 24h")}
         rows={alerts.protests}
         layer="protests"
         fresh={<Fresh s={alerts.protestStatus} stale={2 * 60 * MIN} />}
@@ -157,18 +163,18 @@ export function Events(): JSX.Element {
           />
         )}
       >
-        <p class="fine">Places named in protest news coverage (GDELT). More articles, bigger dot.</p>
+        <p class="fine">{L("Places named in protest news coverage (GDELT). More articles, bigger dot.")}</p>
       </Block>
       <section>
         <h3>
-          Military aircraft <span class="count">{air.planes.length}</span>
+          {L("Military aircraft")} <span class="count">{air.planes.length}</span>
           <span class="grow" />
           <Fresh s={air.status} stale={6 * MIN} />
         </h3>
         <ShowOnMap id="air" />
       </section>
       <Block
-        title="Disease outbreaks"
+        title={L("Disease outbreaks")}
         rows={risk.outbreaks}
         layer="health"
         fresh={<Fresh s={risk.status} stale={8 * 60 * MIN} />}
@@ -176,14 +182,14 @@ export function Events(): JSX.Element {
           <PickRow
             key={o.id}
             pick={{ kind: "outbreak", id: o.id }}
-            title={o.title}
+            title={T(o.title)}
             at={o.at}
             lead={<span class="kind k-health" />}
           />
         )}
       />
       <Block
-        title="Do not travel / reconsider"
+        title={L("Do not travel / reconsider")}
         rows={risk.advisories.filter((a) => a.level >= 3)}
         layer="advisories"
         first={10}
@@ -191,33 +197,39 @@ export function Events(): JSX.Element {
           <PickRow
             key={a.place}
             pick={{ kind: "country", id: a.place }}
-            title={COUNTRIES[a.place]?.name ?? a.name}
+            title={COUNTRIES[a.place] ? C(COUNTRIES[a.place].name, COUNTRIES[a.place].iso) : a.name}
             lead={<span class={`lvl lv${a.level}`}>L{a.level}</span>}
           />
         )}
       />
       <section>
         <h3>
-          GPS interference
+          {L("GPS interference")}
           <span class="grow" />
           <Fresh s={layers.jamStatus} stale={36 * 60 * MIN} />
         </h3>
         {layers.jam.date && (
           <p class="fine">
-            {layers.jam.high} areas with heavy and {layers.jam.medium}{" "}
-            with moderate GPS degradation reported by aircraft on {layers.jam.date} (gpsjam.org).
+            {L(
+              "{high} areas with heavy and {medium} with moderate GPS degradation reported by aircraft on {date} (gpsjam.org).",
+              {
+                high: layers.jam.high,
+                medium: layers.jam.medium,
+                date: layers.jam.date,
+              },
+            )}
           </p>
         )}
         <ShowOnMap id="jam" />
       </section>
       <section>
         <h3>
-          Satellites <span class="count">{sky.tles.length}</span>
+          {L("Satellites")} <span class="count">{sky.tles.length}</span>
           <span class="grow" />
           <Fresh s={sky.status} stale={12 * 60 * MIN} />
         </h3>
         <ShowOnMap id="sats" />
-        {prefs.layers.sats && <p class="fine">Click a satellite on the map to see its orbit.</p>}
+        {prefs.layers.sats && <p class="fine">{L("Click a satellite on the map to see its orbit.")}</p>}
       </section>
     </div>
   );

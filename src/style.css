@@ -1,4 +1,4 @@
-/* Better World Monitor — macOS-grade chrome over a full-bleed WebGL map. */
+/* Globe Now — macOS-grade chrome over a full-bleed WebGL map. */
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
@@ -23,6 +23,8 @@
   --hover: rgba(255, 255, 255, 0.06);
   --sel: rgba(10, 132, 255, 0.22);
   --accent: #0a84ff;
+  --accent-fill: #0a6ad1; /* white text on it: 5.1:1 */
+  --accent-text: #5aaeff; /* on glass / selection: ≥4.6:1 */
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset;
   color-scheme: dark;
 }
@@ -33,11 +35,13 @@
   --line: rgba(0, 0, 0, 0.07);
   --line-strong: rgba(0, 0, 0, 0.12);
   --fg: #1d1d1f;
-  --fg2: rgba(60, 60, 67, 0.7);
+  --fg2: rgba(60, 60, 67, 0.8);
   --fg3: rgba(60, 60, 67, 0.8);
   --hover: rgba(0, 0, 0, 0.04);
   --sel: rgba(0, 122, 255, 0.13);
   --accent: #007aff;
+  --accent-fill: #0062cc; /* 5.8:1 */
+  --accent-text: #0062cc;
   --shadow: 0 12px 40px rgba(30, 40, 60, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
   color-scheme: light;
 }
@@ -207,7 +211,7 @@ p {
 }
 .tab.on {
   background: var(--sel);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* sidebar */
@@ -556,7 +560,7 @@ time {
   color: var(--fg);
 }
 .chip.on {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   box-shadow: none;
 }
@@ -595,7 +599,7 @@ time {
   font-size: 12.5px;
 }
 .link {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 12px;
   display: inline-flex;
   align-items: center;
@@ -772,9 +776,59 @@ input[role="switch"]:checked::after {
   right: var(--gap);
   width: var(--insp);
   border-radius: var(--r);
-  transition: transform 0.34s var(--ease), opacity 0.22s;
+  transition: transform 0.34s var(--ease), opacity 0.22s, width 0.34s var(--ease);
   overflow: hidden;
   display: flex;
+}
+.inspector.wide {
+  width: min(calc(var(--insp) * 2), calc(100vw - var(--rail) - var(--gap) * 4));
+}
+.mapbar.shifted.wide {
+  right: calc(min(calc(var(--insp) * 2), calc(100vw - var(--rail) - var(--gap) * 4)) + var(--gap) * 2);
+}
+.reader {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.reader-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 56px 8px 8px; /* right: room for the panel's close button */
+  min-height: 52px;
+}
+.reader .reader-head {
+  flex: 0 0 auto; /* its content's height, not .inspector-body's flex: 1 */
+  max-height: 40%;
+  padding-right: 48px; /* room for the panel's close button */
+  padding-bottom: 12px;
+}
+.reader-head .open-link {
+  display: none;
+}
+.reader-text {
+  flex: 1;
+  margin: 0;
+  padding: 12px 16px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+  border-top: 1px solid var(--line);
+}
+.reader-host {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reader webview {
+  flex: 1;
+  display: flex; /* Electron sizes the guest from the tag's flex box */
+  background: #fff;
 }
 .inspector:not(.open) {
   transform: translateX(calc(100% + var(--gap) * 2));
@@ -838,7 +892,7 @@ input[role="switch"]:checked::after {
   box-shadow: inset 0 0 0 0.5px var(--line-strong);
 }
 .btn.primary {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   box-shadow: none;
 }
@@ -869,6 +923,9 @@ input[role="switch"]:checked::after {
 }
 .alert.lv2 {
   background: rgba(255, 69, 58, 0.14);
+  color: #ff6961;
+}
+[data-theme="light"] .alert.lv2 {
   color: var(--t4);
 }
 .score-card {
@@ -925,6 +982,38 @@ input[role="switch"]:checked::after {
   height: 38px;
   border-radius: 12px;
   color: var(--fg);
+}
+.proj {
+  display: flex;
+  gap: 6px;
+}
+.mapbar {
+  flex-direction: column;
+  align-items: flex-end;
+}
+/* Watermark above the map switch: the app's name, quiet enough to read through. */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+  color: var(--fg);
+  text-shadow: 0 0 6px var(--bg, rgba(0, 0, 0, 0.3));
+}
+.brand b {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.brand span {
+  font-size: 10.5px;
+}
+.mapbar .icon-btn.on {
+  color: #fff;
+  background: var(--accent-fill);
 }
 
 /* palette */
@@ -1038,7 +1127,7 @@ kbd {
 }
 .mag.m6,
 .mag.m7 {
-  color: #ff6961;
+  color: #ff8a80;
 }
 [data-theme="light"] .mag.m6,
 [data-theme="light"] .mag.m7 {
@@ -1057,6 +1146,7 @@ kbd {
 .maplibregl-ctrl-attrib {
   background: transparent !important;
   font-size: 10px;
+  color: var(--fg2);
 }
 .maplibregl-ctrl-attrib a {
   color: var(--fg3) !important;
@@ -1084,6 +1174,30 @@ kbd {
 }
 .tip .maplibregl-popup-tip {
   display: none;
+}
+.app > .map.off,
+.app > .map.off * {
+  visibility: hidden !important; /* MapLibre's controls set their own visibility */
+}
+.map.equal canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.eq-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  background: var(--glass-strong);
+  color: var(--fg);
+  font: 500 12px var(--font);
+  padding: 5px 9px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
@@ -1113,7 +1227,7 @@ kbd {
 }
 .lvl.lv4 {
   background: rgba(255, 69, 58, 0.2);
-  color: #ff6961;
+  color: #ff8a80;
 }
 .lvl.lv3 {
   background: rgba(255, 159, 10, 0.2);
@@ -1164,8 +1278,9 @@ kbd {
   gap: 4px;
   padding-right: 4px;
 }
-.chip.removable .count {
-  color: rgba(255, 255, 255, 0.75);
+.chip.removable .count,
+.chip.on .count {
+  color: #fff;
   margin-left: 2px;
 }
 .chip.removable button {
@@ -1296,7 +1411,7 @@ kbd {
   background: var(--sel);
 }
 .toggle.soloed .toggle-text > span {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .row.static {
@@ -1464,8 +1579,23 @@ code {
   height: 100%;
   display: flex; /* Electron sizes the guest from the tag's flex box */
 }
-.chips.channels {
+.channels {
   margin: 0 2px 8px;
+}
+.channels h3 {
+  margin: 10px 0 5px;
+}
+.chip.off {
+  opacity: 0.4;
+}
+.tv-off {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 16px;
+  text-align: center;
+  color: #ccc;
+  font-size: 13px;
 }
 
 .select {
@@ -1657,4 +1787,15 @@ code {
 }
 .shield.resize {
   cursor: nwse-resize;
+}
+
+.aipro p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.aipro small {
+  color: var(--fg3);
+  font-size: 11px;
 }

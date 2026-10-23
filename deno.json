@@ -1,6 +1,6 @@
 {
-  "appId": "bwm",
-  "title": "Better World Monitor",
+  "appId": "gn",
+  "title": "Globe Now",
   "aioVersion": "v1.0.23-beta",
   "version": "0.1",
   "client": "electron",
@@ -41,6 +41,7 @@
     "jsxImportSource": "aio"
   },
   "imports": {
+    "@types/d3-geo": "npm:@types/d3-geo@3.1.0",
     "aio": "./dep/aio/mod.ts",
     "aio/air": "./dep/aio/src/air.ts",
     "aio/air/compat": "./dep/aio/src/air-compat.ts",
@@ -60,6 +61,7 @@
     "aio/feedback": "./dep/aio/src/feedback.ts",
     "aio/build": "./dep/aio/src/build.ts",
     "aio/ship": "./dep/aio/src/build/ship.ts",
+    "d3-geo": "npm:d3-geo@3.1.1",
     "esbuild": "npm:esbuild@0.25.12",
     "immer": "npm:immer@10.2.0",
     "happy-dom": "npm:happy-dom@20.14.5",
@@ -86,7 +88,8 @@
     "install:electron": "deno run -A ./dep/aio/src/electron-install.ts",
     "wasm": "cd wasm && cargo build --release --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir ../src/wasm target/wasm32-unknown-unknown/release/bwm_core.wasm",
     "geo": "deno run -A scripts/build-geo.ts",
-    "infra": "deno run -A scripts/build-infra.ts"
+    "infra": "deno run -A scripts/build-infra.ts",
+    "normals": "deno run -A scripts/build-normals.ts"
   },
   "assets": {
     "/assets": "./assets"

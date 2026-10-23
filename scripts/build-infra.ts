@@ -6,7 +6,7 @@
 // Run: deno task infra
 import type * as GeoJSON from "geojson";
 
-const UA = "bwm/0.3 (Better World Monitor desktop app; build script)";
+const UA = "gn/0.3 (Globe Now desktop app; build script)";
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const r2 = (c: unknown): unknown =>
   Array.isArray(c) ? (typeof c[0] === "number" ? c.map((n: number) => Math.round(n * 100) / 100) : c.map(r2)) : c;

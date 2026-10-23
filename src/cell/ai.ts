@@ -1,14 +1,27 @@
 import { cell, serverImport } from "aio";
-import { idle, type Status, tracked } from "../lib/status.ts";
+import type { Response } from "../peers/aipro.ts";
+import { idle, message, type Status, tracked } from "../lib/status.ts";
 
-// Local AI briefs (Ollama). `notes` holds one brief per subject: "world" or a country ISO code.
-export type Note = { text: string; at: number; model: string };
-export type State = {
+// Local AI briefs, served by aipro (the machine's AI provider app). `notes` holds one brief per subject: "world" or a
+// country ISO code. `live` is the brief being written, streamed as it comes.
+export type Note = { text: string; at: number; model: string; note: string };
+export type Live = { key: string; text: string; phase: string; pct: number };
+/** How aipro answered the last brief: ok · busy · refused (unsupported) · failed. */
+export type Last = {
+  kind: "ok" | "busy" | "refused" | "failed";
+  reason: string;
   model: string;
-  models: string[];
+  at: number;
+  ms: number;
+};
+export type State = {
+  /** aipro is running and can write text. */
+  ready: boolean;
   notes: Record<string, Note>;
+  live: Live | null;
+  last: Last | null;
   status: Status;
-  modelStatus: Status;
+  link: Status;
 };
 const io = () => serverImport<typeof import("../server/ai.server.ts")>("../server/ai.server.ts", import.meta.url);
 
@@ -23,10 +36,30 @@ const ask = (subject: string) =>
     ? "Write a world brief: 5 bullet points, one line each, most important first. Start each with a bold topic word."
     : `Write a brief about ${subject}: 3 bullet points, one line each, most important first. Then one line starting "Watch:" naming what to watch next.`;
 
+/** Reasoning models may think aloud first (`<think>…`, maybe still open); the brief is what follows. */
+export const clean = (t: string): string => t.replace(/<think>[\s\S]*?(<\/think>|$)/g, "").trim();
+
+/** aipro's answer → the status line Settings shows. */
+export const lastOf = (r: Response, at: number): Last =>
+  r.ok
+    ? { kind: "ok", reason: r.served.note, model: r.served.name, at, ms: r.ms }
+    : { kind: r.kind === "unsupported" ? "refused" : r.kind, reason: r.reason, model: "", at, ms: 0 };
+
+const INITIAL: State = { ready: false, notes: {}, live: null, last: null, status: idle(), link: idle() };
+
 export const ai = cell("ai", {
-  state: { model: "", models: [], notes: {}, status: idle(), modelStatus: idle() } as State,
-  persist: { exclude: ["status.busy", "modelStatus.busy"] },
-  concurrency: { refreshModels: "first", summarize: "queue" },
+  version: 3,
+  // v2: Ollama model picking moved to aipro; only the briefs carry over. v3: `last`.
+  onMigrate: (s) => ({
+    ...INITIAL,
+    notes: Object.fromEntries(
+      Object.entries((s as { notes?: Record<string, Omit<Note, "note">> }).notes ?? {})
+        .map(([k, n]) => [k, { ...n, note: "" }]),
+    ),
+  }),
+  state: INITIAL,
+  persist: { exclude: ["status.busy", "link.busy", "live"] },
+  concurrency: { check: "first", summarize: "queue" },
   long: ["summarize"],
   args: {
     summarize: [
@@ -36,30 +69,55 @@ export const ai = cell("ai", {
     ],
   },
   methods: {
-    async refreshModels(s) {
-      await tracked(s, "modelStatus", async () => {
-        const models = await (await io()).models();
-        s.models = models;
-        // aio-ok: the CURRENT choice on purpose — keep it if still installed (setModel may have run meanwhile)
-        if (!models.includes(s.model)) s.model = models[0] ?? "";
+    /** Is aipro up, and can it write text on this machine? */
+    async check(s) {
+      await tracked(s, "link", async () => {
+        const caps = await (await io()).capabilities();
+        s.ready = !!caps?.some((c) => c.task === "text" && !c.paidOnly);
+        if (!caps) throw new Error("aipro is not running");
+        if (!s.ready) throw new Error("aipro has no local text model");
       });
-    },
-    setModel(s, model: string) {
-      if (!s.models.includes(model)) throw new Error(`model ${model} not installed`);
-      s.model = model;
     },
     /** Brief `subject` from headlines (newest, most-reported first); stored under `key`. */
     async summarize(s, subject: string, key: string, headlines: string[]) {
-      const model = s.model;
       await tracked(s, "status", async () => {
-        if (!model) throw new Error("No local model — install Ollama and pull one (e.g. qwen3:1.7b)");
-        const text = await (await io()).chat(
-          model,
-          SYSTEM,
-          `${ask(subject)}\n\nHeadlines:\n- ${headlines.join("\n- ")}`,
-        );
-        if (!text) throw new Error(`${model} returned nothing`);
-        s.notes[key] = { text, at: Date.now(), model };
+        s.live = { key, text: "", phase: "", pct: -1 };
+        let r: Response;
+        try {
+          const it = (await io()).brief(crypto.randomUUID(), [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: `${ask(subject)}\n\nHeadlines:\n- ${headlines.join("\n- ")}` },
+          ]);
+          let text = "", shown = 0;
+          for (let n = await it.next();; n = await it.next()) {
+            if (n.done) {
+              r = n.value;
+              break;
+            }
+            const c = n.value;
+            if (c.type === "delta") text += c.text;
+            else s.live = { ...s.live!, phase: c.phase ?? s.live!.phase, pct: c.pct ?? -1 };
+            // ~6 updates a second: smooth to read, cheap to sync.
+            if (Date.now() - shown > 150) {
+              s.live = { ...s.live!, text: clean(text) };
+              shown = Date.now();
+            }
+          }
+        } catch (e) {
+          // The link broke mid-brief (aipro quit): no briefs until the next check finds it again.
+          r = { v: 1, ok: false, kind: "failed", reason: `aipro connection lost: ${message(e)}` };
+          s.ready = false;
+        } finally {
+          s.live = null;
+        }
+        s.last = lastOf(r, Date.now());
+        if (!r.ok) {
+          if (r.kind === "unsupported") s.ready = false;
+          throw new Error(r.reason);
+        }
+        const out = clean(String(r.output.kind === "value" ? r.output.value : ""));
+        if (!out) throw new Error(`${r.served.name} returned nothing`);
+        s.notes[key] = { text: out, at: Date.now(), model: r.served.name, note: r.served.note };
       });
     },
   },

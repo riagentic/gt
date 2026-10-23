@@ -1,4 +1,4 @@
-# Working on bwm with an AI agent
+# Working on gn (Globe Now) with an AI agent
 
 This app is built on [aio](https://github.com/riagentic/aio) — one `cell({ state, methods })` drives server state,
 persistence, sync and the UI. It is not React, Express or Next; guessing from those produces code that type-checks and

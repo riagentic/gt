@@ -10,6 +10,7 @@ import { COUNTRIES } from "../data/countries.ts";
 import { PLACES } from "../data/places.ts";
 import { Icon, type IconName } from "./icons.tsx";
 import { focus } from "./rows.tsx";
+import { C, L, T } from "./i18n.ts";
 import { type Site, sites } from "./store.ts";
 
 const SITE_SUB: Record<Site["kind"], string> = {
@@ -33,25 +34,38 @@ function search(q: string): Hit[] {
   const t = q.trim().toLowerCase();
   if (!t) return [];
   const has = (s: string) => s.toLowerCase().includes(t);
+  const hasC = (c: { name: string; iso: string }) => has(c.name) || has(C(c.name, c.iso));
   return [
-    ...COUNTRIES.map((c, id) => ({ c, id })).filter(({ c }) => has(c.name)).slice(0, 5)
+    ...COUNTRIES.map((c, id) => ({ c, id })).filter(({ c }) => hasC(c)).slice(0, 5)
       .map(({ c, id }): Hit => ({
         key: `c${id}`,
         icon: "globe",
-        label: c.name,
-        sub: "Country",
+        label: C(c.name, c.iso),
+        sub: L("Country"),
         pick: { kind: "country", id },
       })),
-    ...PLACES.filter((p) => has(p.name)).slice(0, 4)
-      .map((p): Hit => ({ key: p.id, icon: "pin", label: p.name, sub: p.note, pick: { kind: "place", id: p.id } })),
+    ...PLACES.filter((p) => has(p.name) || has(L(p.name))).slice(0, 4)
+      .map((p): Hit => ({
+        key: p.id,
+        icon: "pin",
+        label: L(p.name),
+        sub: L(p.note),
+        pick: { kind: "place", id: p.id },
+      })),
     ...news.stories.filter((s) => has(s.title)).slice(0, 8)
-      .map((s): Hit => ({ key: s.id, icon: "news", label: s.title, sub: s.source, pick: { kind: "story", id: s.id } })),
+      .map((s): Hit => ({
+        key: s.id,
+        icon: "news",
+        label: T(s.title),
+        sub: s.source,
+        pick: { kind: "story", id: s.id },
+      })),
     ...sky.tles.filter((t) => has(t.name)).slice(0, 4)
       .map((t): Hit => ({
         key: `sat${t.id}`,
         icon: "sat",
         label: t.name,
-        sub: "Satellite",
+        sub: L("Satellite"),
         pick: { kind: "sat", id: t.id },
       })),
     ...[...(sites.value?.byId.values() ?? [])].filter((x) => has(x.title)).slice(0, 5)
@@ -59,7 +73,7 @@ function search(q: string): Hit[] {
         key: `site${x.id}`,
         icon: "pin",
         label: x.title,
-        sub: SITE_SUB[x.kind],
+        sub: L(SITE_SUB[x.kind]),
         pick: { kind: "site", id: x.id },
       })),
     ...hazards.quakes.filter((q) => has(q.place)).slice(0, 4)
@@ -67,7 +81,7 @@ function search(q: string): Hit[] {
         key: q.id,
         icon: "wave",
         label: `M${q.mag.toFixed(1)} · ${q.place}`,
-        sub: "Earthquake",
+        sub: L("Earthquake"),
         pick: { kind: "quake", id: q.id },
       })),
   ];
@@ -93,12 +107,12 @@ function Box(): JSX.Element {
   onGlobalKey("escape", close);
   return (
     <div class="scrim" role="presentation" onClick={(e) => e.target === e.currentTarget && close()}>
-      <div class="palette" role="dialog" aria-label="Search">
+      <div class="palette" role="dialog" aria-label={L("Search")}>
         <label class="palette-input">
           <Icon name="search" size={18} />
           <input
-            aria-label="Search everything"
-            placeholder="Search countries, places, stories, earthquakes…"
+            aria-label={L("Search everything")}
+            placeholder={L("Search countries, places, stories, earthquakes…")}
             value={q}
             ref={(el: HTMLElement | null) => void (el && queueMicrotask(() => el.focus()))}
             onInput={(e) => (setQ((e.target as HTMLInputElement).value), setSel(0))}
@@ -108,11 +122,11 @@ function Box(): JSX.Element {
               else if (e.key === "Enter") go(hits[sel]);
             }}
           />
-          <kbd>esc</kbd>
+          <kbd>{L("esc")}</kbd>
         </label>
         {q && (
           <div class="hits" role="listbox">
-            {hits.length === 0 && <p class="empty">No matches.</p>}
+            {hits.length === 0 && <p class="empty">{L("No matches.")}</p>}
             {hits.map((h, i) => (
               <button
                 type="button"

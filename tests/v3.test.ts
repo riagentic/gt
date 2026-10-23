@@ -176,20 +176,15 @@ Deno.test("radiation + anomaly + status pages", () => {
     3 * 86_400_000,
   );
   assertEquals(r.map((x) => [x.id, x.cpm]), [["1", 40]]);
-  const clim = {
-    properties: {
-      parameter: {
-        T2M: { JAN: 0, FEB: 0, MAR: 0, APR: 0, MAY: 0, JUN: 0, JUL: 0, AUG: 0, SEP: 10, OCT: 10, NOV: 4, DEC: 0 },
-      },
-    },
-  };
-  // Mid-October sits between two 10° months → normal 10; 14° observed → +4. Fill values (−999) skipped.
-  const daily = {
-    properties: { parameter: { T2M: { "20261014": 13, "20261015": 15, "20261016": 14, "20261017": -999 } } },
-  };
-  assertEquals(W.anomaly("DE", "Germany", 10, 51, daily, clim)?.delta, 4);
-  assertEquals(W.normalFor([0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 0], new Date(Date.UTC(2026, 9, 31))) > 10, true);
-  assertEquals(W.anomaly("DE", "Germany", 10, 51, daily, { properties: { parameter: { T2M: {} } } }), null);
+  // Normal 10 + 5·cos(2πt): 15 on Jan 1, 5 mid-year. Observed 14,16 near Jan 1 → ≈+0; nulls skipped.
+  const coef = [10, 5, 0, 0, 0, 0, 0];
+  assertEquals(Math.round(W.normalAt(coef, 0.5)), 5);
+  const daily = { time: ["2026-01-01", "2026-01-02", "2026-01-03"], temperature_2m_mean: [14, 16, null] };
+  assertEquals(W.anomaly("DE", "Germany", 10, 51, daily, coef, 7), null); // < 3 valid days
+  daily.time.push("2026-01-04");
+  (daily.temperature_2m_mean as (number | null)[]).push(21);
+  assertEquals(W.anomaly("DE", "Germany", 10, 51, daily, coef)?.delta, 2); // mean 17 vs ≈15
+  assertEquals(W.anomaly("DE", "Germany", 10, 51, daily, undefined), null); // no baked normal
   assertEquals(W.statusPage("X", "u", { status: { indicator: "major", description: "Outage" } }).level, "major");
   assertEquals(W.statusPage("X", "u", { status: { indicator: "none" } }).level, "ok");
 });

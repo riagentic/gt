@@ -1,43 +1,37 @@
 // Live TV: the docked tab and the floating in-app player (movable, resizable, closable, above everything).
 import type { JSX } from "aio";
-import { onWindowEvent, signal } from "aio/air";
+import { onWindowEvent, signal, useEffect, useInterval } from "aio/air";
 import { prefs } from "../cell/prefs.ts";
+import { tvlive } from "../cell/tvlive.ts";
+import { CHANNELS, GROUPS } from "../data/channels.ts";
 import { clampRect, moveRect, type Rect, resizeRect } from "../lib/rect.ts";
-import { guestScript, MUTED, readSound, type Sound } from "../lib/sound.ts";
+import { guestScript, readSound, type Sound, START } from "../lib/sound.ts";
 import { Head } from "./bits.tsx";
+import { L } from "./i18n.ts";
 import { Icon } from "./icons.tsx";
 
-export const CHANNELS: [string, string][] = [
-  ["Al Jazeera", "UCNye-wNBqNL5ZzHSJj3l8Bg"],
-  ["DW News", "UCknLrEdhRCp1aegoMqRaCZg"],
-  ["France 24", "UCQfwfsi5VrQ8yKZ-UWmAEFg"],
-  ["Euronews", "UCSrZ3UV4jOidv8ppoVuvW9Q"],
-  ["Sky News", "UCoMdktPbSTixAyNGwb-UYkQ"],
-  ["Bloomberg", "UCIALMKvObZNtJ6AmdCLP7Lg"],
-  ["NHK World", "UCSPEjw8F2nQDtmUKPFNF7_A"],
-  ["CNA", "UC83jt4dlz1Gjl58fzQrrKZg"],
-  ["TRT World", "UC7fWeaHhqgM4Ry-RMpM2YYw"],
-  ["WION", "UC_gUM8rL-Lrg6O3adPW9K1g"],
-  ["ABC Australia", "UCVgO39Bk5sMo66-6o6Spn6Q"],
-  ["ABC News", "UCBi2mrWuNuyYy4gbM6fU18Q"],
-  ["CBS News", "UC8p1vwvWtl6T73JiExfWs1g"],
-  ["LiveNOW", "UCJg9wBPyKMNA5sRDnvzmkdg"],
-  ["NASA", "UCLA_DiR1FfKNvjuUpBHmylQ"],
-];
+const EMBED = "autoplay=1&mute=1&playsinline=1";
+/** What the player loads: a site for `page` channels; else the channel's current live video (from tvlive), or —
+ *  before the first check — YouTube's "this channel's stream" embed, which fails for many live channels. */
+const srcOf = (channel: string): string => {
+  const page = CHANNELS.find((c) => c.id === channel)?.page;
+  if (page) return page;
+  const video = tvlive.videos[channel];
+  return video
+    ? `https://www.youtube-nocookie.com/embed/${video}?${EMBED}`
+    : `https://www.youtube-nocookie.com/embed/live_stream?channel=${channel}&${EMBED}`;
+};
 
-const url = (channel: string) =>
-  `https://www.youtube-nocookie.com/embed/live_stream?channel=${channel}&autoplay=1&mute=1&playsinline=1`;
-
-/** Last sound the viewer chose (mute, volume). A new channel, dock or pop-out starts with it. */
-let sound: Sound = MUTED;
+/** Last sound the viewer chose (mute, volume); START until they touch it. A new channel, dock or pop-out starts with it. */
+let sound: Sound = START;
 
 type Guest = HTMLElement & { executeJavaScript(code: string): Promise<unknown> };
 
 /** Referrer and session go on before the first `src`: the first request already needs them. The renderer may reuse
  *  the element when the channel changes, so a new channel navigates it (Electron sends `httpreferrer` again).
  *  Each page load gets the current sound and reports changes back through the guest console. */
-const play = (el: HTMLElement, channel: string) => {
-  if (el.getAttribute("src") === url(channel)) return;
+const play = (el: HTMLElement, src: string) => {
+  if (el.dataset.want === src) return; // keyed on what we asked for: sites rewrite `src` when they redirect
   if (!el.getAttribute("src")) {
     el.setAttribute("httpreferrer", "https://www.youtube-nocookie.com/");
     el.setAttribute("partition", "persist:tv");
@@ -47,31 +41,49 @@ const play = (el: HTMLElement, channel: string) => {
       if (s) sound = s;
     });
   }
-  el.setAttribute("src", url(channel));
+  el.dataset.want = src;
+  el.setAttribute("src", src);
 };
 
 /** A <webview>, not an <iframe>: the app page lives at aio://, which sends YouTube no Referer, and the embed then
  *  refuses to play (error 153). The guest page carries its own https referrer. */
-const Player = (props: { channel: string }): JSX.Element => (
-  <webview
-    key={props.channel}
-    ref={(el: HTMLElement | null) => el && play(el, props.channel)}
-  />
-);
+const Player = (props: { channel: string }): JSX.Element => {
+  // Check who is on air while a player is showing (the cell does it at most every 30 min).
+  useEffect(() => void tvlive.check(false), []);
+  useInterval(() => void tvlive.check(false), 5 * 60_000);
+  if (tvlive.videos[props.channel] === null) {
+    const name = CHANNELS.find((c) => c.id === props.channel)?.name ?? L("This channel");
+    return <p class="tv-off">{L("{name} is off air right now. Pick a channel that isn't greyed out.", { name })}</p>;
+  }
+  const src = srcOf(props.channel);
+  return <webview key={props.channel} ref={(el: HTMLElement | null) => el && play(el, src)} />;
+};
 
+/** Channels by group; off-air ones (per the last check) are greyed. */
 const Channels = (): JSX.Element => (
-  <div class="chips channels" role="tablist" aria-label="Channel">
-    {CHANNELS.map(([name, id]) => (
-      <button
-        type="button"
-        key={id}
-        role="tab"
-        aria-selected={prefs.tv.channel === id}
-        class={prefs.tv.channel === id ? "chip on" : "chip"}
-        onClick={() => prefs.setChannel(id)}
-      >
-        {name}
-      </button>
+  <div class="channels" role="tablist" aria-label={L("Channel")}>
+    {GROUPS.map((g) => (
+      <section key={g}>
+        <h3>{L(g)}</h3>
+        <div class="chips">
+          {CHANNELS.filter((c) => c.group === g).map(({ name, id }) => {
+            const off = tvlive.videos[id] === null;
+            return (
+              <button
+                type="button"
+                key={id}
+                role="tab"
+                aria-selected={prefs.tv.channel === id}
+                class={`chip${prefs.tv.channel === id ? " on" : ""}${off ? " off" : ""}`}
+                title={off ? L("{name} · off air now", { name }) : name}
+                onClick={() => prefs.setChannel(id)}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      </section>
     ))}
   </div>
 );
@@ -138,13 +150,13 @@ export function Tv(): JSX.Element {
   const tv = prefs.tv;
   return (
     <div class="panel">
-      <Head title="Live TV" />
+      <Head title={L("Live TV")} />
       {tv.floating
         ? (
           <div class="tv tv-away">
-            <p>Playing in the floating player.</p>
+            <p>{L("Playing in the floating player.")}</p>
             <button type="button" class="btn" t="tv_dock_here" onClick={() => prefs.dockTv()}>
-              <Icon name="sidebar" size={14} /> Bring it back here
+              <Icon name="sidebar" size={14} /> {L("Bring it back here")}
             </button>
           </div>
         )
@@ -153,11 +165,11 @@ export function Tv(): JSX.Element {
             <div
               class="tv-grip"
               t="tv_grip"
-              title="Drag out to float the player"
+              title={L("Drag out to float the player")}
               onPointerDown={(e) => grab(e as PointerEvent)}
             >
               <span class="dots" aria-hidden="true" />
-              <span>Drag out to watch while you work</span>
+              <span>{L("Drag out to watch while you work")}</span>
               <span class="grow" />
               <button
                 type="button"
@@ -170,7 +182,7 @@ export function Tv(): JSX.Element {
                   void prefs.floatTv(clampRect({ x: v.w - w - 24, y: v.h - h - 76, w, h }, v)); // clear of the map buttons
                 }}
               >
-                Pop out
+                {L("Pop out")}
               </button>
             </div>
             <div class="tv">
@@ -179,7 +191,11 @@ export function Tv(): JSX.Element {
           </>
         )}
       <Channels />
-      <p class="fine">Streams start muted. Played by YouTube; a channel that is off air shows YouTube's notice.</p>
+      <p class="fine">
+        {L(
+          "Greyed channels were off air at the last check (every 30 min while TV is open); shows with a schedule light up when they go live. Infowars, EWTN and Daystar play from their own sites.",
+        )}
+      </p>
     </div>
   );
 }
@@ -200,31 +216,37 @@ export function TvFloat(): JSX.Element {
     <>
       <section
         class={`tv-float${g ? " busy" : ""}`}
-        aria-label="Live TV player"
+        aria-label={L("Live TV player")}
         style={{ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` }}
       >
         <header
           t="tv_title"
           onPointerDown={(e) => (e as PointerEvent).button === 0 && begin(e as PointerEvent, "move", r)}
           onDblClick={() => prefs.dockTv()}
-          title="Drag to move · double-click to dock"
+          title={L("Drag to move · double-click to dock")}
         >
           <span class="live-dot" />
           <select
-            aria-label="Channel"
+            aria-label={L("Channel")}
             value={tv.channel}
             onPointerDown={(e) => e.stopPropagation()}
             onChange={(e) => prefs.setChannel((e.target as HTMLSelectElement).value)}
           >
-            {CHANNELS.map(([name, id]) => <option key={id} value={id}>{name}</option>)}
+            {GROUPS.map((g) => (
+              <optgroup key={g} label={L(g)}>
+                {CHANNELS.filter((c) => c.group === g).map(({ name, id }) => (
+                  <option key={id} value={id} disabled={tvlive.videos[id] === null}>{name}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
           <span class="grow" />
           <button
             type="button"
             class="icon-btn"
             t="tv_dock"
-            aria-label="Dock in Live TV tab"
-            title="Dock"
+            aria-label={L("Dock in Live TV tab")}
+            title={L("Dock")}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => prefs.dockTv()}
           >
@@ -234,8 +256,8 @@ export function TvFloat(): JSX.Element {
             type="button"
             class="icon-btn"
             t="tv_close"
-            aria-label="Close player"
-            title="Close"
+            aria-label={L("Close player")}
+            title={L("Close")}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => prefs.closeTv()}
           >

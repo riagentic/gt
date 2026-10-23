@@ -13,13 +13,16 @@ testCell(prefs, "tabs: switch, re-click collapses, toggleSidebar reopens", (t) =
 
 testCell(prefs, "layers, projection, theme, region, magnitude", async (t) => {
   t.send.setLayer("air", true);
-  t.send.setGlobe(false);
+  t.send.setProjection("equal");
   t.send.setTheme("dark");
   t.send.setRegion("europe");
   t.send.setMinMag(6);
-  t.expect.state((s) => s.layers.air && !s.globe && s.theme === "dark" && s.region === "europe" && s.minMag === 6);
+  t.expect.state((s) =>
+    s.layers.air && s.projection === "equal" && s.theme === "dark" && s.region === "europe" && s.minMag === 6
+  );
   await t.expect.rejects(() => t.send.setLayer("nope" as never, true), /no layer/);
   await t.expect.rejects(() => t.send.setMinMag(1), /2\.5–8/);
+  await t.expect.rejects(() => t.send.setProjection("polar" as never), /no projection/);
   assertEquals(Object.keys(t.getState().layers).length, LAYERS.length);
 });
 
@@ -55,6 +58,10 @@ testCell(prefs, "tv: float, move, dock (opens the tab), close; channel and rect 
   t.send.floatTv({ x: 1, y: 1, w: 300, h: 200 });
   t.send.closeTv();
   t.expect.state((s) => !s.tv.floating && s.tv.channel === "UCknLrEdhRCp1aegoMqRaCZg");
-  await t.expect.rejects(() => t.send.setChannel("nope"), /not a YouTube channel/);
+  await t.expect.rejects(() => t.send.setChannel("nope"), /not a channel id/);
+  t.expect.state((s) => s.lang === "en");
+  t.send.setLang("cs");
+  t.expect.state((s) => s.lang === "cs");
+  await t.expect.rejects(() => t.send.setLang("de" as "cs"), /no language de/);
   await t.expect.rejects(() => t.send.moveTv({ x: 1 } as never), /rect/);
 });

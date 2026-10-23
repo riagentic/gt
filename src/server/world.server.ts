@@ -1,9 +1,13 @@
 // Fetches for the v0.3 sources. Server-only (network); cells call these. Parsers live in src/lib.
+import { CLIMATE } from "../data/climate.ts";
 import { BY_ISO, COUNTRIES } from "../data/countries.ts";
+import { NORMALS } from "../data/normals.ts";
 import * as A from "../lib/alerts.ts";
 import * as E from "../lib/econ.ts";
+import * as M from "../lib/meteo.ts";
 import * as N from "../lib/normalize.ts";
 import * as W from "../lib/world.ts";
+import { liveVideo } from "../lib/sound.ts";
 import { put } from "./blobs.server.ts";
 import { get, json, pool, text } from "./net.server.ts";
 
@@ -126,33 +130,32 @@ export const radiation = async (now: number): Promise<W.Sensor[]> =>
 export const co2 = async (): Promise<W.Co2 | null> =>
   W.co2(await text("https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_daily_mlo.csv"));
 
-/** Countries sampled for the temperature anomaly: populous, spread over every climate zone. */
-const CLIMATE = (
-  "US CA MX BR AR CO PE CL GB FR DE ES IT PL UA SE NO TR RU KZ IR SA EG NG ET KE CD ZA DZ MA " +
-  "IN PK BD CN MN JP KR ID PH TH VN AU NZ GL"
-).split(" ").flatMap((iso) => (BY_ISO[iso] !== undefined ? [COUNTRIES[BY_ISO[iso]]] : []));
+const CLIMATE_POINTS = CLIMATE.flatMap((iso) => (BY_ISO[iso] !== undefined ? [COUNTRIES[BY_ISO[iso]]] : []));
 
-const POWER = "https://power.larc.nasa.gov/api/temporal";
-const power = (path: string, c: { lon: number; lat: number }, extra = "") =>
-  json(
-    `${POWER}/${path}/point?parameters=T2M&community=RE&longitude=${c.lon.toFixed(2)}&latitude=${
-      c.lat.toFixed(2)
-    }&format=JSON${extra}`,
+/** ERA5 (Open-Meteo archive, ~5 days behind): last 7 days vs the baked 1991–2020 ERA5 normal. One request for all
+ *  points, ≈66 of the free tier's 10,000 daily calls. */
+export async function climate(now: number): Promise<W.Anomaly[]> {
+  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const res = await json(
+    `https://archive-api.open-meteo.com/v1/archive?latitude=${CLIMATE_POINTS.map((c) => c.lat.toFixed(2))}` +
+      `&longitude=${CLIMATE_POINTS.map((c) => c.lon.toFixed(2))}&start_date=${day(now - 21 * DAY)}` +
+      `&end_date=${day(now - DAY)}&daily=temperature_2m_mean&models=era5&timezone=GMT`,
     {},
     60_000,
   );
-const normals = new Map<string, unknown>(); // 2001–2025 monthly means never change: fetched once per run
-
-/** NASA POWER: last 7 days (it lags ~3) vs the 2001–2025 mean for those dates, at each country's label point. */
-export async function climate(now: number): Promise<W.Anomaly[]> {
-  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10).replaceAll("-", "");
-  const res = await pool(CLIMATE, 4, async (c) => {
-    if (!normals.has(c.iso)) normals.set(c.iso, await power("climatology", c));
-    const recent = await power("daily", c, `&start=${day(now - 14 * DAY)}&end=${day(now - DAY)}`);
-    return W.anomaly(c.iso, c.name, c.lon, c.lat, recent, normals.get(c.iso));
+  const rows = Array.isArray(res) ? res : [res];
+  const out = CLIMATE_POINTS.flatMap((c, i) => {
+    const a = W.anomaly(
+      c.iso,
+      c.name,
+      c.lon,
+      c.lat,
+      (rows[i] as { daily?: unknown } | undefined)?.daily,
+      NORMALS[c.iso],
+    );
+    return a ? [a] : [];
   });
-  const out = res.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
-  if (!out.length) throw new Error("NASA POWER unreachable");
+  if (!out.length) throw new Error("Open-Meteo ERA5: no temperature data");
   return out;
 }
 
@@ -260,4 +263,70 @@ export async function imagery(lon: number, lat: number): Promise<W.Image | null>
       scene: String(f.id ?? ""),
     }
     : null;
+}
+
+// ── Weather maps ───────────────────────────────────────────────────────────
+/** Current temperature on the 10° grid: 540 points in 3 requests (≈540 of Open-Meteo's 10,000 free daily calls). */
+export async function temps(now: number): Promise<M.Temps> {
+  const chunks = Array.from({ length: Math.ceil(M.GRID.length / 180) }, (_, i) => M.GRID.slice(i * 180, i * 180 + 180));
+  const rows = await Promise.all(chunks.map(async (pts) => {
+    const j = await json(
+      `https://api.open-meteo.com/v1/forecast?latitude=${pts.map((p) => p[0])}&longitude=${
+        pts.map((p) => p[1])
+      }&current=temperature_2m&timezone=GMT`,
+      {},
+      40_000,
+    );
+    return Array.isArray(j) ? j : [j];
+  }));
+  const t = M.currentTemps(rows.flat());
+  if (t.every((v) => v === null)) throw new Error("Open-Meteo: no temperatures");
+  return { at: now, t };
+}
+
+/** Current tropical cyclones + their geometry, stored as one blob; returns the list and the blob URL. */
+export async function cyclones(previousUrl: string): Promise<{ storms: M.Storm[]; url: string }> {
+  const list = M.storms(await json("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP"));
+  const res = await pool(list, 3, async (s) => {
+    const [, eventid, episodeid] = s.id.split("-");
+    return M.stormGeometry(
+      await json(
+        `https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=TC&eventid=${eventid}&episodeid=${episodeid}`,
+        {},
+        120_000, // GDACS builds this on demand: ~1 min per storm is normal
+      ),
+      s,
+    );
+  });
+  const features = res.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const url = await put(JSON.stringify({ type: "FeatureCollection", features }), "cyclones.geojson", previousUrl);
+  return { storms: list, url };
+}
+
+// ── Live TV ────────────────────────────────────────────────────────────────
+/** Channel → its live video id, or null when off air / not embeddable. Reads each /live page only until the answer
+ *  (~0.8 MB). */
+export async function liveChannels(ids: string[]): Promise<Record<string, string | null>> {
+  const res = await pool(ids, 4, async (id) => {
+    const r = await get(`https://www.youtube.com/channel/${id}/live`, "text/html", 20_000, {
+      headers: { "Accept-Language": "en-US,en;q=0.9", Cookie: "SOCS=CAI" },
+    });
+    const reader = r.body!.pipeThrough(new TextDecoderStream()).getReader();
+    let html = "";
+    for (let n = 0; n < 1_500_000;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += value;
+      n += value.length;
+      if (
+        /"playableInEmbed":(true|false)/.test(html.slice(-value.length - 40)) ||
+        /canonical" href="[^"]*\/channel\//.test(html)
+      ) break;
+    }
+    await reader.cancel().catch(() => {});
+    return [id, liveVideo(html)] as const;
+  });
+  const out = Object.fromEntries(res.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])));
+  if (!Object.keys(out).length) throw new Error("YouTube unreachable");
+  return out;
 }

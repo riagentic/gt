@@ -3,6 +3,7 @@ import type { JSX } from "aio";
 import { atlas } from "../cell/atlas.ts";
 import { Fresh, Head } from "./bits.tsx";
 import { Block } from "./Events.tsx";
+import { C, L, T } from "./i18n.ts";
 import { MIN, PickRow } from "./rows.tsx";
 
 export function Systems(): JSX.Element {
@@ -12,21 +13,21 @@ export function Systems(): JSX.Element {
   const odd = [...atlas.climate].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   return (
     <div class="panel">
-      <Head title="Systems" />
+      <Head title={L("Systems")} />
       <Block
-        title="Chokepoint traffic"
+        title={L("Chokepoint traffic")}
         rows={traffic}
         layer="places"
         first={8}
         fresh={<Fresh s={atlas.trafficStatus} stale={36 * 60 * MIN} />}
-        empty="Loading IMF PortWatch…"
+        empty={L("Loading IMF PortWatch…")}
         row={(t) => {
           const d = t.avg ? Math.round((100 * (t.ships - t.avg)) / t.avg) : 0;
           return (
             <PickRow
               key={t.id}
               pick={{ kind: "chokepoint", id: t.id }}
-              title={t.name}
+              title={T(t.name)}
               aside={
                 <span class="trend">
                   <b>{t.ships}</b>
@@ -37,17 +38,17 @@ export function Systems(): JSX.Element {
           );
         }}
       >
-        <p class="fine">Ships per day on the latest day vs the 30-day average.</p>
+        <p class="fine">{L("Ships per day on the latest day vs the 30-day average.")}</p>
       </Block>
       <section>
         <h3>
-          Services {down.length > 0 && <span class="count t3">{down.length} down</span>}
+          {L("Services")} {down.length > 0 && <span class="count t3">{L("{n} down", { n: down.length })}</span>}
           <span class="grow" />
           <Fresh s={atlas.serviceStatus} stale={15 * MIN} />
         </h3>
         <div class="services">
           {atlas.services.map((x) => (
-            <a key={x.name} class={`svc ${x.level}`} href={x.url} target="_blank" rel="noreferrer" title={x.text}>
+            <a key={x.name} class={`svc ${x.level}`} href={x.url} target="_blank" rel="noreferrer" title={T(x.text)}>
               <i />
               {x.name}
             </a>
@@ -56,22 +57,24 @@ export function Systems(): JSX.Element {
       </section>
       {atlas.co2 && (
         <section>
-          <h3>Atmospheric CO₂</h3>
+          <h3>{L("Atmospheric CO₂")}</h3>
           <div class="score-card">
             <b class="t2">{atlas.co2.ppm.toFixed(0)}</b>
             <div>
-              <span>parts per million</span>
-              <small>Mauna Loa, {atlas.co2.date}.</small>
+              <span>{L("parts per million")}</span>
+              <small>{L("Mauna Loa, {date}.", { date: atlas.co2.date })}</small>
               <small>
-                {atlas.co2.delta >= 0 ? "+" : ""}
-                {atlas.co2.delta} ppm vs a year ago ({atlas.co2.yearAgo.toFixed(1)}). Pre-industrial level: ~280.
+                {L("{d} ppm vs a year ago ({y}). Pre-industrial level: ~280.", {
+                  d: `${atlas.co2.delta >= 0 ? "+" : ""}${atlas.co2.delta}`,
+                  y: atlas.co2.yearAgo.toFixed(1),
+                })}
               </small>
             </div>
           </div>
         </section>
       )}
       <Block
-        title="Highest radiation"
+        title={L("Highest radiation")}
         rows={hot}
         layer="radiation"
         first={5}
@@ -80,15 +83,15 @@ export function Systems(): JSX.Element {
           <PickRow
             key={x.id}
             pick={{ kind: "sensor", id: x.id }}
-            title={x.name || "Sensor"}
+            title={x.name || L("Sensor")}
             aside={<span class={`count ${x.cpm >= 300 ? "t3" : x.cpm >= 100 ? "t2" : ""}`}>{x.cpm} CPM</span>}
           />
         )}
       >
-        <p class="fine">Safecast sensors reporting in the last 3 days. Background is ~30–60 CPM.</p>
+        <p class="fine">{L("Safecast sensors reporting in the last 3 days. Background is ~30–60 CPM.")}</p>
       </Block>
       <Block
-        title="Temperature anomalies"
+        title={L("Temperature anomalies")}
         rows={odd}
         layer="climate"
         first={6}
@@ -96,14 +99,15 @@ export function Systems(): JSX.Element {
           <PickRow
             key={x.id}
             pick={{ kind: "anomaly", id: x.id }}
-            title={x.name}
+            title={C(x.name, x.id)}
             aside={<span class={x.delta > 0 ? "hot" : "cold"}>{x.delta > 0 ? "+" : ""}{x.delta}°C</span>}
           />
         )}
       >
         <p class="fine">
-          Latest 7 days vs the 2001–2025 average for those dates, at each country's center (NASA POWER, ~3 days behind).
-          Live and long-term values come from two NASA models: treat differences under ~2°C as noise.
+          {L(
+            "Latest 7 days vs the 1991–2020 normal for those dates, at each country's center. Both from ERA5 (Copernicus, via Open-Meteo), ~5 days behind.",
+          )}
         </p>
       </Block>
     </div>

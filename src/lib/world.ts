@@ -1,5 +1,5 @@
 // Parsers: protests (GDELT), chokepoint traffic (PortWatch), country profiles (World Bank, UNHCR, OFAC),
-// radiation (Safecast), temperature anomaly (NASA POWER), IMF, BIS, CO₂ (NOAA), service status. Pure.
+// radiation (Safecast), temperature anomaly (ERA5 via Open-Meteo), IMF, BIS, CO₂ (NOAA), service status. Pure.
 // deno-lint-ignore-file no-explicit-any
 import { BY_ISO, BY_ISO3, COUNTRIES } from "../data/countries.ts";
 
@@ -177,7 +177,7 @@ export const radiation = (j: any, now: number, maxAge: number): Sensor[] =>
     }];
   });
 
-// ── Temperature anomaly (NASA POWER) ───────────────────────────────────────
+// ── Temperature anomaly (ERA5 via Open-Meteo) ──────────────────────────────
 export type Anomaly = {
   id: string;
   name: string;
@@ -187,35 +187,41 @@ export type Anomaly = {
   normal: number;
   delta: number;
 };
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+export const HARMONICS = 3;
 
-/** Climatological mean for a date: monthly means taken at mid-month, interpolated linearly between them. */
-export const normalFor = (monthly: number[], date: Date): number => {
-  const m = date.getUTCMonth(), dim = new Date(Date.UTC(date.getUTCFullYear(), m + 1, 0)).getUTCDate();
-  const pos = (date.getUTCDate() - 0.5) / dim - 0.5; // −0.5…+0.5 around mid-month
-  const other = pos >= 0 ? (m + 1) % 12 : (m + 11) % 12;
-  return monthly[m] + (monthly[other] - monthly[m]) * Math.abs(pos);
+/** Fraction of the UTC year at noon of an ISO date: 0…1. */
+export const yearFrac = (iso: string): number => {
+  const d = new Date(iso + "T12:00:00Z"), y = d.getUTCFullYear();
+  return (d.getTime() - Date.UTC(y, 0, 1)) / (Date.UTC(y + 1, 0, 1) - Date.UTC(y, 0, 1));
 };
 
-/** Mean of the last `days` valid daily values vs the climatology for those same dates. One dataset (POWER) for
- *  both sides, so model and grid biases cancel. */
+/** Normal for a fraction of the year from harmonic coefficients [a0, a1, b1, a2, b2, …]. */
+export const normalAt = (coef: number[], t: number): number =>
+  coef.reduce((sum, c, i) => {
+    if (i === 0) return c;
+    const k = Math.ceil(i / 2), x = 2 * Math.PI * k * t;
+    return sum + c * (i % 2 ? Math.cos(x) : Math.sin(x));
+  }, 0);
+
+/** Mean of the last `days` valid ERA5 daily means vs the ERA5 1991–2020 normal for those dates. One dataset, one
+ *  grid cell for both sides, so model and grid biases cancel. */
 export const anomaly = (
   id: string,
   name: string,
   lon: number,
   lat: number,
   daily: any,
-  climatology: any,
+  coef: number[] | undefined,
   days = 7,
 ): Anomaly | null => {
-  const monthly = MONTHS.map((k) => Number(climatology?.properties?.parameter?.T2M?.[k]));
-  if (monthly.some((v) => !Number.isFinite(v) || v <= -999)) return null;
-  const obs = Object.entries(daily?.properties?.parameter?.T2M ?? {})
-    .filter(([, v]) => typeof v === "number" && v > -999).slice(-days) as [string, number][];
+  if (coef?.length !== 1 + 2 * HARMONICS) return null;
+  const time: unknown[] = Array.isArray(daily?.time) ? daily.time : [];
+  const temp: unknown[] = Array.isArray(daily?.temperature_2m_mean) ? daily.temperature_2m_mean : [];
+  const obs = time.flatMap((t, i) => (typeof t === "string" && typeof temp[i] === "number" ? [[t, temp[i]]] : []))
+    .slice(-days) as [string, number][];
   if (obs.length < Math.min(3, days)) return null;
-  const date = (k: string) => new Date(Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)));
-  const now = obs.reduce((t, [, v]) => t + v, 0) / obs.length;
-  const normal = obs.reduce((t, [k]) => t + normalFor(monthly, date(k)), 0) / obs.length;
+  const now = obs.reduce((sum, [, v]) => sum + v, 0) / obs.length;
+  const normal = obs.reduce((sum, [t]) => sum + normalAt(coef, yearFrac(t)), 0) / obs.length;
   return { id, name, lon, lat, now: +now.toFixed(1), normal: +normal.toFixed(1), delta: +(now - normal).toFixed(1) };
 };
 

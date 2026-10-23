@@ -1,10 +1,12 @@
 // Shell: full-bleed map; floating rail + sidebar on the left, inspector on the right.
 import type { JSX } from "aio";
 import { onGlobalKey, onMount, onWindowEvent, useInterval } from "aio/air";
-import { prefs, type Tab } from "./cell/prefs.ts";
+import cfg from "../deno.json" with { type: "json" };
+import { prefs, type Projection, PROJECTIONS, type Tab } from "./cell/prefs.ts";
 import { view } from "./cell/view.ts";
 import { Icon, type IconName } from "./ui/icons.tsx";
 import { Inspector } from "./ui/Inspector.tsx";
+import { EqualMap } from "./ui/EqualMap.tsx";
 import { MapView } from "./ui/Map.tsx";
 import { Palette } from "./ui/Palette.tsx";
 import { Events } from "./ui/Events.tsx";
@@ -14,6 +16,7 @@ import { Systems } from "./ui/Systems.tsx";
 import { Tv, TvFloat } from "./ui/Tv.tsx";
 import { Watch } from "./ui/Watch.tsx";
 import { dark, loadSites, loadWorld, now } from "./ui/store.ts";
+import { L } from "./ui/i18n.ts";
 
 const TABS: { id: Tab; icon: IconName; label: string; panel: () => JSX.Element }[] = [
   { id: "brief", icon: "brief", label: "Brief", panel: Brief },
@@ -35,14 +38,38 @@ const typing = (e: KeyboardEvent) => {
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 };
 
+const next = (p: Projection) => PROJECTIONS[(PROJECTIONS.indexOf(p) + 1) % PROJECTIONS.length];
+const PROJ: Record<Projection, [IconName, string]> = {
+  globe: ["globe", "Globe"],
+  mercator: ["map", "Flat map"],
+  equal: ["equal", "True-size map (Equal Earth)"],
+};
+export const ProjectionSwitch = (): JSX.Element => (
+  <div class="proj" role="group" aria-label={L("Map type")}>
+    {PROJECTIONS.map((p) => (
+      <button
+        type="button"
+        key={p}
+        class={prefs.projection === p ? "icon-btn on" : "icon-btn"}
+        aria-label={L(PROJ[p][1])}
+        aria-pressed={prefs.projection === p}
+        title={`${L(PROJ[p][1])}  G`}
+        onClick={() => prefs.setProjection(p)}
+      >
+        <Icon name={PROJ[p][0]} size={18} />
+      </button>
+    ))}
+  </div>
+);
+
 function Lights(): JSX.Element {
   const w = (globalThis as { __aioWindow?: AioWindow }).__aioWindow;
   if (!w) return <div class="lights-gap" />;
   return (
     <div class="lights">
-      <button type="button" class="light close" aria-label="Close window" onClick={() => w.close()} />
-      <button type="button" class="light min" aria-label="Minimize window" onClick={() => w.minimize()} />
-      <button type="button" class="light max" aria-label="Zoom window" onClick={() => w.maximize()} />
+      <button type="button" class="light close" aria-label={L("Close window")} onClick={() => w.close()} />
+      <button type="button" class="light min" aria-label={L("Minimize window")} onClick={() => w.minimize()} />
+      <button type="button" class="light max" aria-label={L("Zoom window")} onClick={() => w.maximize()} />
     </div>
   );
 }
@@ -51,8 +78,20 @@ export default function App(): JSX.Element {
   useInterval(() => now.set(Date.now()), 30_000);
   onMount(() => void loadWorld().then(loadSites));
   onGlobalKey("k", (e) => (e.preventDefault(), view.setPalette(true)), { mod: true });
-  onGlobalKey("escape", (e) => !typing(e) && !view.palette && view.select(null));
-  onGlobalKey("g", (e) => !typing(e) && prefs.setGlobe(!prefs.globe));
+  onGlobalKey(
+    "escape",
+    (e) =>
+      !typing(e) && !view.palette &&
+      (view.full ? view.setFull(false) : view.page ? view.read(null) : view.select(null)),
+  );
+  // Every outside link opens in the in-app reader (right panel), never the system browser.
+  onWindowEvent("click", (e: MouseEvent) => {
+    const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+    if (!a || !/^https?:/.test(a.href)) return;
+    e.preventDefault();
+    view.read(a.href);
+  });
+  onGlobalKey("g", (e) => !typing(e) && prefs.setProjection(next(prefs.projection)));
   onGlobalKey("\\", (e) => !typing(e) && prefs.toggleSidebar());
   onWindowEvent("keydown", (e: KeyboardEvent) => {
     const t = TABS[Number(e.key) - 1];
@@ -64,15 +103,16 @@ export default function App(): JSX.Element {
   return (
     <div class="app" data-theme={dark.value ? "dark" : "light"}>
       <MapView />
+      {prefs.projection === "equal" && <EqualMap />}
       <div class="drag" />
-      <nav class="rail" aria-label="Sections">
+      <nav class="rail" aria-label={L("Sections")}>
         <Lights />
         {TABS.slice(0, -1).map((t) => (
           <button
             type="button"
             key={t.id}
-            aria-label={t.label}
-            title={t.label}
+            aria-label={L(t.label)}
+            title={L(t.label)}
             class={prefs.sidebar && prefs.tab === t.id ? "tab on" : "tab"}
             onClick={() => prefs.setTab(t.id)}
           >
@@ -80,13 +120,19 @@ export default function App(): JSX.Element {
           </button>
         ))}
         <span class="grow" />
-        <button type="button" aria-label="Search" title="Search  ⌘K" class="tab" onClick={() => view.setPalette(true)}>
+        <button
+          type="button"
+          aria-label={L("Search")}
+          title={`${L("Search")}  ⌘K`}
+          class="tab"
+          onClick={() => view.setPalette(true)}
+        >
           <Icon name="search" size={19} />
         </button>
         <button
           type="button"
-          aria-label="Settings"
-          title="Settings"
+          aria-label={L("Settings")}
+          title={L("Settings")}
           class={prefs.sidebar && prefs.tab === "settings" ? "tab on" : "tab"}
           onClick={() => prefs.setTab("settings")}
         >
@@ -95,23 +141,20 @@ export default function App(): JSX.Element {
       </nav>
       <aside
         class={`sidebar${prefs.sidebar ? " open" : ""}${prefs.tab === "tv" && !prefs.tv.floating ? " wide" : ""}`}
-        aria-label={active.label}
+        aria-label={L(active.label)}
         aria-hidden={!prefs.sidebar}
       >
         <Panel />
       </aside>
       <Inspector />
       <TvFloat />
-      <div class={view.pick ? "mapbar shifted" : "mapbar"}>
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label={prefs.globe ? "Flat map" : "Globe"}
-          title={prefs.globe ? "Flat map  G" : "Globe  G"}
-          onClick={() => prefs.setGlobe(!prefs.globe)}
-        >
-          <Icon name={prefs.globe ? "map" : "globe"} size={18} />
-        </button>
+      <div class={`mapbar${view.pick || view.page ? " shifted" : ""}${view.page ? " wide" : ""}`}>
+        <div class="brand" aria-hidden="true">
+          <b>globe now {cfg.version}</b>
+          <span>{L("built with aio")}</span>
+          <span>{L("by riagentic")}</span>
+        </div>
+        <ProjectionSwitch />
       </div>
       <Palette />
     </div>

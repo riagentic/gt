@@ -48,6 +48,28 @@ testUI(App, "story → inspector → country", { seed }, async (ui) => {
   await ui.waitFor(() => view.pick === null);
 });
 
+testUI(App, "outside links open in the in-app reader, back returns to the details", { seed }, async (ui) => {
+  ui.NewsButton.click();
+  ui.story_s1.click();
+  await ui.waitFor(() => view.pick?.kind === "story");
+  ui.open_link.click();
+  await ui.waitFor(() => view.page === "https://example.org/a");
+  view.read(null);
+  await ui.waitFor(() => view.page === null && view.pick?.kind === "story");
+});
+
+testUI(App, "story: details → article under them → article alone → details", { seed }, async (ui) => {
+  ui.NewsButton.click();
+  ui.story_s1.click();
+  await ui.waitFor(() => view.pick?.kind === "story" && view.page === null);
+  ui.story_s1.click();
+  await ui.waitFor(() => view.page === "https://example.org/a" && !view.full);
+  ui.story_s1.click();
+  await ui.waitFor(() => view.page === "https://example.org/a" && view.full);
+  ui.story_s1.click();
+  await ui.waitFor(() => view.page === null && !view.full && view.pick?.kind === "story");
+});
+
 testUI(App, "region filter + text filter", { seed }, async (ui) => {
   ui.NewsButton.click();
   ui.region_asia.click();
