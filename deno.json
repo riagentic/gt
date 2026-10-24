@@ -71,7 +71,9 @@
     "maplibre-gl": "npm:maplibre-gl@5.24.0",
     "geojson": "npm:@types/geojson@7946.0.16",
     "satellite.js": "npm:satellite.js@7.1.0",
-    "h3-js": "npm:h3-js@4.5.0"
+    "h3-js": "npm:h3-js@4.5.0",
+    "@ghostery/adblocker": "npm:@ghostery/adblocker@2.20.1",
+    "tldts-experimental": "npm:tldts-experimental@7.4.19"
   },
   "tasks": {
     "dev": "deno run -A src/app.ts --client=electron",

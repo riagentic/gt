@@ -16,7 +16,8 @@ import { Systems } from "./ui/Systems.tsx";
 import { Tv, TvFloat } from "./ui/Tv.tsx";
 import { Watch } from "./ui/Watch.tsx";
 import { dark, loadSites, loadWorld, now } from "./ui/store.ts";
-import { L } from "./ui/i18n.ts";
+import { L, watchLang } from "./ui/i18n.ts";
+import { watchPage } from "./ui/pagetr.ts";
 
 const TABS: { id: Tab; icon: IconName; label: string; panel: () => JSX.Element }[] = [
   { id: "brief", icon: "brief", label: "Brief", panel: Brief },
@@ -77,6 +78,10 @@ function Lights(): JSX.Element {
 export default function App(): JSX.Element {
   useInterval(() => now.set(Date.now()), 30_000);
   onMount(() => void loadWorld().then(loadSites));
+  onMount(() => {
+    const off = [...watchLang(), ...watchPage()];
+    return () => off.forEach((f) => f());
+  });
   onGlobalKey("k", (e) => (e.preventDefault(), view.setPalette(true)), { mod: true });
   onGlobalKey(
     "escape",

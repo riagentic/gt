@@ -385,7 +385,7 @@ function Reader(props: { url: string }): JSX.Element {
       {text === null
         ? (
           <>
-            {prefs.lang !== "en" && <TranslateBar />}
+            <TranslateBar />
             <webview
               ref={(el: HTMLElement | null) => {
                 attach(el);
@@ -399,7 +399,7 @@ function Reader(props: { url: string }): JSX.Element {
   );
 }
 
-/** Czech mode: how far the in-page translation is, and a switch back to the page's own text. */
+/** Not in English: how far the in-page translation is, and a switch back to the page's own text. */
 function TranslateBar(): JSX.Element | null {
   const p = page.value;
   if (!p) return null;

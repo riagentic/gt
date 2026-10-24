@@ -85,17 +85,22 @@ export const languageLabel = (code: string): string => {
   }
 };
 
-// The page's language, for fonts and screen readers. Layout stays left-to-right; each block of text takes its own
-// direction from its content (style.css `unicode-bidi: plaintext`), so Arabic, Urdu and Persian read right to left.
-if (typeof document !== "undefined") effect(() => void (document.documentElement.lang = locale()));
-
-// Translate into the active language only: a switch drops what is still queued for the old one, here and in aipro.
-let shown: string | null = null;
-effect(() => {
-  const lang = prefs.lang;
-  if (shown !== null && lang !== shown) {
-    queues.front.length = queues.back.length = 0;
-    tr.keep(lang).catch(() => {});
-  }
-  shown = lang;
-});
+/** Start the language hooks: from the app's onMount — an effect made at import never re-runs on cell state. Answers
+ *  their disposers. */
+export const watchLang = (): (() => void)[] => {
+  let shown: string | null = null;
+  return [
+    // The page's language, for fonts and screen readers. Layout stays left-to-right; each block of text takes its own
+    // direction from its content (style.css `unicode-bidi: plaintext`), so Arabic, Urdu and Persian read right to left.
+    effect(() => void (document.documentElement.lang = locale())),
+    // Translate into the active language only: a switch drops what is still queued for the old one, here and in aipro.
+    effect(() => {
+      const lang = prefs.lang;
+      if (shown !== null && lang !== shown) {
+        queues.front.length = queues.back.length = 0;
+        tr.keep(lang).catch(() => {});
+      }
+      shown = lang;
+    }),
+  ];
+};

@@ -43,3 +43,18 @@ export const apply = (m: Record<number, string>): string =>
 
 /** Back to the page's own text. */
 export const RESTORE = `(() => { ${restore} })()`;
+
+/** Was this document seen before (answers false once per document)? */
+export const SEEN = `(() => { const s = window.__gnSeen === true; window.__gnSeen = true; return s; })()`;
+
+/** The page's classes, ids and link targets not sent before (for ad filters): [classes, ids, hrefs]. */
+export const FEATURES = `(() => {
+  const seen = (window.__gnAb ??= new Set()), out = [[], [], []];
+  const add = (k, v) => { const key = k + v; if (v && !seen.has(key)) { seen.add(key); out[k].push(v); } };
+  for (const e of document.querySelectorAll("[class],[id],a[href]")) {
+    for (const c of e.classList) add(0, c);
+    add(1, e.id);
+    if (e.localName === "a") add(2, e.getAttribute("href"));
+  }
+  return out;
+})()`;
