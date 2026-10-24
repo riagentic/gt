@@ -1,0 +1,45 @@
+// Scripts run inside the reader's web page to translate it in place (like a browser's Translate). Pure strings: the
+// page runs them, the app only passes texts in and out. Originals are kept in the page (`window.__gn`) for "Original".
+
+/** Readable blocks; a block holding another block is skipped (its inner ones are taken). */
+const BLOCK = "h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,td,th,caption,summary";
+const SKIP = "nav,footer,aside,form,button,select,script,style,noscript,[role=navigation],[aria-hidden=true]";
+export const MAX_BLOCKS = 200;
+
+/** Put every translated block back to its own HTML. */
+const restore = `for (const [i, h] of Object.entries(window.__gn ?? {})) {
+    const e = document.querySelector('[data-gn="' + i + '"]');
+    if (e) e.innerHTML = h;
+  }
+  window.__gn = {};`;
+
+/** Undo any earlier translation, tag each readable block `data-gn=<i>`, answer their texts in page order. */
+export const COLLECT = `(() => {
+  ${restore}
+  const out = [];
+  for (const e of document.querySelectorAll(${JSON.stringify(BLOCK)})) {
+    if (out.length >= ${MAX_BLOCKS}) break;
+    e.removeAttribute("data-gn");
+    if (e.closest(${JSON.stringify(SKIP)}) || e.querySelector(${JSON.stringify(BLOCK)})) continue;
+    const t = (e.innerText ?? e.textContent ?? "").replace(/\\s+/g, " ").trim();
+    if (t.length < 2 || t.length > 4000 || !/\\p{L}/u.test(t)) continue;
+    e.setAttribute("data-gn", String(out.length));
+    out.push(t);
+  }
+  return out;
+})()`;
+
+/** Put translations into their blocks: { index: text }. Plain text only — never HTML. */
+export const apply = (m: Record<number, string>): string =>
+  `((m) => {
+  const s = (window.__gn ??= {});
+  for (const i in m) {
+    const e = document.querySelector('[data-gn="' + i + '"]');
+    if (!e) continue;
+    if (!(i in s)) s[i] = e.innerHTML;
+    e.textContent = m[i];
+  }
+})(${JSON.stringify(m)})`;
+
+/** Back to the page's own text. */
+export const RESTORE = `(() => { ${restore} })()`;

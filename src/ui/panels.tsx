@@ -16,10 +16,11 @@ import { type Pick, view } from "../cell/view.ts";
 import { watch } from "../cell/watch.ts";
 import { COUNTRIES } from "../data/countries.ts";
 import { FEEDS, REGIONS } from "../data/feeds.ts";
+import { BY_CODE, LANGUAGES } from "../data/languages.ts";
 import { THREATS } from "../lib/alerts.ts";
 import { band } from "../lib/score.ts";
 import { AiproStatus, Empty, Fresh, Head } from "./bits.tsx";
-import { C, L, T } from "./i18n.ts";
+import { C, L, languageLabel, T } from "./i18n.ts";
 import { Icon } from "./icons.tsx";
 import { focus, MIN, picked, PickRow, QuoteRow, StoryRow } from "./rows.tsx";
 import { AiBrief } from "./Details.tsx";
@@ -51,6 +52,14 @@ const Clocks = (): JSX.Element => (
     })}
   </div>
 );
+
+/** Language choices: English first, then by English name. */
+const OPTIONS: [string, string][] = [
+  ["en", "English"],
+  ...LANGUAGES.filter((l) => l.code !== "en")
+    .map((l): [string, string] => [l.code, languageLabel(l.code)])
+    .sort((a, b) => (BY_CODE[a[0]].name < BY_CODE[b[0]].name ? -1 : 1)),
+];
 
 export function Brief(): JSX.Element {
   const hot = news.stories.filter((s) => s.size >= 3 && now.value - s.at < 6 * 60 * MIN).slice(0, 6);
@@ -379,27 +388,33 @@ export function Settings(): JSX.Element {
       </section>
       <section>
         <h3>{L("Language")}</h3>
-        <div class="seg wide" role="group" aria-label={L("Language")}>
-          {([["en", "English"], ["cs", "Čeština"]] as const).map(([lang, name]) => (
-            <button
-              type="button"
-              key={lang}
-              class={prefs.lang === lang ? "on" : ""}
-              onClick={() => prefs.setLang(lang)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <label class="select">
+          <span>{L("Language")}</span>
+          <select
+            t="language"
+            aria-label={L("Language")}
+            value={prefs.lang}
+            onChange={(e) => prefs.setLang((e.target as HTMLSelectElement).value)}
+          >
+            {OPTIONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+        </label>
         {prefs.lang === "cs" && (
           <p class="fine">
             {L(
               "Fixed text is translated in the app. Live text (news, alerts, briefs) is translated once by aipro on this computer and kept — it needs aipro running.",
             )}
-            {tr.pending > 0 && ` ${L("Translating {n}…", { n: tr.pending })}`}
           </p>
         )}
-        {prefs.lang === "cs" && !tr.status.ok && tr.status.err && <p class="fine err">{L(tr.status.err)}</p>}
+        {prefs.lang !== "en" && prefs.lang !== "cs" && (
+          <p class="fine">
+            {L(
+              "Menus and live text (news, alerts, briefs) are translated by aipro on this computer the first time they are shown, then kept — it needs aipro running. Quality depends on the model and the language.",
+            )}
+          </p>
+        )}
+        {prefs.lang !== "en" && tr.pending > 0 && <p class="fine">{L("Translating {n}…", { n: tr.pending })}</p>}
+        {prefs.lang !== "en" && !tr.status.ok && tr.status.err && <p class="fine err">{L(tr.status.err)}</p>}
       </section>
       <section>
         <h3>
@@ -434,7 +449,7 @@ export function Settings(): JSX.Element {
         <AiproStatus />
         <p class="fine">
           {L(
-            "AI briefs come from aipro, the AI app on this computer — nothing is sent anywhere. Globe Now asks for qwen3:1.7b; aipro picks another local model when that one is missing. AI features stay off while aipro is not running and come back on their own within 30 s of it starting.",
+            "AI briefs come from aipro, the AI app on this computer — nothing is sent anywhere. aipro's default models write them and the translations — choose them in aipro. AI features stay off while aipro is not running and come back on their own within 30 s of it starting.",
           )}
         </p>
       </section>

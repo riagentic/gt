@@ -13,7 +13,7 @@ import { EURO } from "../lib/world.ts";
 import { band, type Instability } from "../lib/score.ts";
 import { Empty } from "./bits.tsx";
 import { Icon } from "./icons.tsx";
-import { C, L, T } from "./i18n.ts";
+import { C, L, locale, T } from "./i18n.ts";
 import { focus, StoryRow } from "./rows.tsx";
 import * as P from "./pick.ts";
 import { now } from "./store.ts";
@@ -31,11 +31,11 @@ export const Facts = (props: { rows: [string, JSX.Children][] }): JSX.Element =>
 );
 
 /** "5m ago" in the UI language. */
-export const since = (at: number): string => since_(at, now.value, prefs.lang === "cs");
+export const since = (at: number): string => since_(at, now.value, prefs.lang);
 
 /** Date + time in the UI language's format. */
 export const stamp = (at: number): string =>
-  new Date(at).toLocaleString(L("en-US"), { dateStyle: "medium", timeStyle: "short" });
+  new Date(at).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
 
 export const when = (at: number) => `${stamp(at)} · ${since(at)}`;
 

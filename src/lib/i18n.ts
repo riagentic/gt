@@ -19,3 +19,17 @@ export const fill = (s: string, vars?: Record<string, string | number>): string 
 
 /** Days since the epoch — when a translation was last asked for (unused ones are pruned). */
 export const day = (at: number): number => Math.floor(at / 86_400_000);
+
+/** Where a text's translation into `lang` is stored. Czech keeps the plain key it was first saved under. */
+export const tkey = (lang: string, text: string): string => key(lang === "cs" ? text : `${lang}\u0000${text}`);
+
+/** A queued text: "<lang>\0<text>". */
+export const item = (lang: string, text: string): string => `${lang}\u0000${text}`;
+export const unitem = (q: string): [lang: string, text: string] => {
+  const i = q.indexOf("\u0000");
+  return [q.slice(0, i), q.slice(i + 1)];
+};
+
+/** A translation that dropped a `{name}` fill-in would show a raw hole — keep the English instead. */
+export const keepsFills = (en: string, out: string): boolean =>
+  (en.match(/\{\w+\}/g) ?? []).every((f) => out.includes(f));

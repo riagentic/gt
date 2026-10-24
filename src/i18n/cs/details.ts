@@ -192,4 +192,11 @@ export default {
   "Quake": "Zemětřesení",
   "Ice": "Led",
   "Other": "Jiné",
+  // reader: in-page translation
+  "Translation needs aipro": "Překlad potřebuje aipro",
+  "Translating {done}/{all}…": "Překládám {done}/{all}…",
+  "Translated by aipro": "Přeloženo pomocí aipro",
+  "Try again": "Zkusit znovu",
+  "Show translation": "Zobrazit překlad",
+  "Show original": "Zobrazit originál",
 } as Record<string, string>;

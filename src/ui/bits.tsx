@@ -14,7 +14,7 @@ export const Fresh = (props: { s: Status; stale: number }): JSX.Element => {
     ? L("Updating…")
     : !s.at
     ? L("Loading…")
-    : `${s.ok ? L("Updated") : s.err} · ${since(s.at, now.value, prefs.lang === "cs")}`;
+    : `${s.ok ? L("Updated") : s.err} · ${since(s.at, now.value, prefs.lang)}`;
   return (
     <span class={`fresh ${state}`} title={s.err || label}>
       <i />
@@ -56,7 +56,7 @@ export const AiproStatus = (): JSX.Element => {
               <i />
               {L("Last request: {kind}", { kind: L(l.kind) })}
               {l.model && ` · ${l.model}`}
-              {l.ms > 0 && ` · ${(l.ms / 1000).toFixed(1)} s`} · {since(l.at, now.value, prefs.lang === "cs")}
+              {l.ms > 0 && ` · ${(l.ms / 1000).toFixed(1)} s`} · {since(l.at, now.value, prefs.lang)}
             </span>
           )
           : (

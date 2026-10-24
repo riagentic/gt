@@ -1607,6 +1607,12 @@ code {
 .select span {
   color: var(--fg2);
 }
+/* The open list is drawn by the system: give it the theme's colors, or dark mode shows white text on white. */
+select option,
+select optgroup {
+  background: var(--bg);
+  color: var(--fg);
+}
 .select select {
   flex: 1;
   font: inherit;
@@ -1798,4 +1804,30 @@ code {
 .aipro small {
   color: var(--fg3);
   font-size: 11px;
+}
+
+.reader-tr {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+/* Translated text reads in its own direction (Arabic, Urdu, Persian: right to left) inside the left-to-right layout. */
+p,
+li,
+dd,
+dt,
+h1,
+h2,
+h3,
+h4,
+small,
+.title,
+.q-name,
+.md {
+  unicode-bidi: plaintext;
 }

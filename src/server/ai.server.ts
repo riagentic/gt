@@ -5,10 +5,13 @@ import { type Peer, peer } from "aio/server";
 import type { Capability, Chunk, Grant, Msg, Need, Response } from "../peers/aipro.ts";
 
 export const APP = "gn";
-/** Preferred model; aipro falls back to its own text default when it cannot serve it. */
-export const NEED: Need = { task: "text", model: "ollama/qwen3:1.7b" };
-/** Translation: gemma4:12b writes far better Czech than the small Qwen models (tested); aipro's default otherwise. */
-export const TRANSLATE: Need = { task: "translate", model: "ollama/gemma4:12b" };
+/** No model named: aipro serves each task with its own default, which the user picks in aipro. */
+export const NEED: Need = { task: "text" };
+export const TRANSLATE: Need = { task: "translate" };
+/** Longest one translation may take; aipro's lease lapses after 30 s without a beat. */
+const RUN_MS = 90_000, BEAT_MS = 10_000;
+/** Room for any real translation of `text` (scripts like Czech or Thai take more tokens per character), not more. */
+export const maxTokens = (text: string): number => Math.min(4096, text.length * 2 + 64);
 const OFF = "aipro is not running — start it for AI briefs"; // Czech: i18n/cs/data.ts
 
 let link: Promise<Peer | null> | null = null;
@@ -50,25 +53,44 @@ export async function* brief(id: string, messages: Msg[]): AsyncGenerator<Chunk,
   return await s.result;
 }
 
-/** Translate many texts on one lease (one model load, beat between runs). Yields [index, translation | null] as each
- *  lands; a refusal of the whole batch (aipro off, no model, busy) is the return value. */
-export async function* translate(texts: string[], to: string): AsyncGenerator<[number, string | null], string> {
+/** A translator on one aipro lease (one model load for many texts), or why aipro refused. `run` answers null when the
+ *  model failed on that text or ran away (no answer in RUN_MS, or a reply far longer than the text — small models
+ *  sometimes loop); it throws when aipro went away or is busy. The lease is beaten while a run is going too. */
+export async function translator(
+  to: string,
+): Promise<{ run(text: string): Promise<string | null>; close(): Promise<void> } | string> {
   const p = await aipro();
   if (!p) return OFF;
   const g = await p.call<Grant>("broker", "connect", APP, TRANSLATE, "background");
   if (!g.ok) return g.reason;
-  try {
-    for (const [i, text] of texts.entries()) {
-      const r = await p.call<Response>("broker", "run", g.lease.id, {
-        v: 1,
-        input: { text, to },
-        params: { temperature: 0 },
-      });
-      yield [i, r.ok && r.output.kind === "value" ? String(r.output.value).trim() || null : null];
-      await p.call("broker", "beat", g.lease.id);
-    }
-    return "";
-  } finally {
-    await p.call("broker", "release", g.lease.id).catch(() => {});
-  }
+  const lease = g.lease.id;
+  const beat = setInterval(() => p.call("broker", "beat", lease).catch(() => {}), BEAT_MS);
+  return {
+    async run(text) {
+      const id = crypto.randomUUID();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<null>((done) => timer = setTimeout(() => done(null), RUN_MS));
+      const r = await Promise.race([
+        p.call<Response>("broker", "run", lease, {
+          v: 1,
+          id,
+          input: { text, to },
+          params: { temperature: 0, max_tokens: maxTokens(text) },
+        }),
+        late,
+      ]).finally(() => clearTimeout(timer));
+      if (!r) {
+        await p.call("broker", "cancel", id).catch(() => {});
+        return null;
+      }
+      // Busy (still on a cut-off run): stop here and keep the queue — failing every queued text would lose them.
+      if (!r.ok && r.kind === "busy") throw new Error(r.reason);
+      const out = r.ok && r.output.kind === "value" ? String(r.output.value).trim() : "";
+      return out && out.length <= text.length * 3 + 40 ? out : null;
+    },
+    close: () => {
+      clearInterval(beat);
+      return p.call("broker", "release", lease).then(() => {}, () => {});
+    },
+  };
 }

@@ -3,7 +3,6 @@ import "./cell/prefs.ts";
 import "./cell/view.ts";
 import "./cell/watch.ts";
 import "./cell/tvlive.ts";
-import "./cell/tr.ts";
 import "./server/sources.server.ts"; // embed server-only modules for deno compile
 import "./server/blobs.server.ts";
 import "./server/world.server.ts";
@@ -23,6 +22,7 @@ import { news } from "./cell/news.ts";
 import { risk } from "./cell/risk.ts";
 import { signals } from "./cell/signals.ts";
 import { sky } from "./cell/sky.ts";
+import { tr } from "./cell/tr.ts";
 
 const MIN = 60_000;
 
@@ -60,6 +60,7 @@ await aio.run({
     { id: "temps", every: 3 * 60 * MIN, action: meteo.refreshTemps.action() },
     { id: "storms", every: 60 * MIN, action: meteo.refreshStorms.action() },
     { id: "aipro", every: MIN / 2, action: ai.check.action() },
+    { id: "translate", every: MIN / 2, action: tr.drain.action() },
   ],
   onStart: () => {
     news.refresh();

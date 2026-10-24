@@ -62,6 +62,6 @@ testCell(prefs, "tv: float, move, dock (opens the tab), close; channel and rect 
   t.expect.state((s) => s.lang === "en");
   t.send.setLang("cs");
   t.expect.state((s) => s.lang === "cs");
-  await t.expect.rejects(() => t.send.setLang("de" as "cs"), /no language de/);
+  await t.expect.rejects(() => t.send.setLang("xx"), /no language xx/);
   await t.expect.rejects(() => t.send.moveTv({ x: 1 } as never), /rect/);
 });

@@ -1,5 +1,6 @@
 import { cell } from "aio";
 import type { Region } from "../data/feeds.ts";
+import { BY_CODE } from "../data/languages.ts";
 import type { Rect } from "../lib/rect.ts";
 
 export type Tab =
@@ -48,9 +49,9 @@ export const PROJECTIONS: Projection[] = ["globe", "mercator", "equal"];
 export type Preset = "world" | "security" | "trade" | "tech" | "planet";
 /** Live TV: last channel, and the floating player (in-app, above everything) when popped out. */
 export type TvState = { channel: string; floating: boolean; rect: Rect };
-/** UI language: fixed text from src/i18n, live text (news …) translated once by aipro (cell `tr`). */
-export type Lang = "en" | "cs";
-export const LANGS: Lang[] = ["en", "cs"];
+/** UI language (a code from data/languages.ts): Czech fixed text from src/i18n; other fixed text and all live text
+ *  (news …) translated once by aipro (cell `tr`). */
+export type Lang = string;
 export type State = {
   lang: Lang;
   tv: TvState;
@@ -198,7 +199,7 @@ export const prefs = cell("prefs", {
       s.projection = p;
     },
     setLang(s, lang: Lang) {
-      if (!LANGS.includes(lang)) throw new Error(`no language ${lang}`);
+      if (!BY_CODE[lang]) throw new Error(`no language ${lang}`);
       s.lang = lang;
     },
     setTheme(s, theme: State["theme"]) {

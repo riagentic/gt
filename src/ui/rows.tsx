@@ -52,7 +52,7 @@ export const StoryRow = (props: { s: Story }): JSX.Element => {
           <span key={p} class="tag">{COUNTRIES[p] && C(COUNTRIES[p].name, COUNTRIES[p].iso)}</span>
         ))}
         <span class="grow" />
-        <time>{ago(s.at, now.value, prefs.lang === "cs")}</time>
+        <time>{ago(s.at, now.value, prefs.lang)}</time>
       </span>
     </button>
   );
@@ -70,7 +70,7 @@ export const PickRow = (
   >
     {props.lead}
     <span class="row-title one">{props.title}</span>
-    {props.aside ?? (props.at ? <time>{ago(props.at, now.value, prefs.lang === "cs")}</time> : null)}
+    {props.aside ?? (props.at ? <time>{ago(props.at, now.value, prefs.lang)}</time> : null)}
   </button>
 );
 
@@ -94,7 +94,7 @@ export const QuakeRow = (props: { q: Quake }): JSX.Element => (
   >
     <span class={`mag m${Math.min(7, Math.floor(props.q.mag))}`}>{props.q.mag.toFixed(1)}</span>
     <span class="row-title one">{props.q.place ? T(props.q.place) : L("Unknown location")}</span>
-    <time>{ago(props.q.at, now.value, prefs.lang === "cs")}</time>
+    <time>{ago(props.q.at, now.value, prefs.lang)}</time>
   </button>
 );
 
@@ -107,7 +107,7 @@ export const EventRow = (props: { e: Hazard }): JSX.Element => (
   >
     <span class={`kind k-${props.e.kind} lv${props.e.level}`} title={L(KIND_LABEL[props.e.kind])} />
     <span class="row-title one">{T(props.e.title)}</span>
-    <time>{ago(props.e.at, now.value, prefs.lang === "cs")}</time>
+    <time>{ago(props.e.at, now.value, prefs.lang)}</time>
   </button>
 );
 

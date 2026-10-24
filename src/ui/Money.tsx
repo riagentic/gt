@@ -7,7 +7,7 @@ import { signals } from "../cell/signals.ts";
 import { label } from "../lib/signals.ts";
 import { compact } from "../lib/fmt.ts";
 import { Empty, Fresh, Head } from "./bits.tsx";
-import { C, L, T } from "./i18n.ts";
+import { C, L, locale, T } from "./i18n.ts";
 import { MIN, QuoteRow } from "./rows.tsx";
 
 const moodLabel = (v: number) =>
@@ -164,7 +164,7 @@ function Signals(): JSX.Element {
 
 /** "2025-07-14" → "Jul 25": when the rate was last set. */
 const monthYear = (d: string) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString(prefs.lang === "cs" ? "cs-CZ" : "en-GB", {
+  new Date(`${d}T00:00:00Z`).toLocaleDateString(prefs.lang === "en" ? "en-GB" : locale(), {
     month: "short",
     year: "2-digit",
     timeZone: "UTC",
@@ -247,7 +247,7 @@ export function Bets(): JSX.Element {
               <span class="grow" />
               {b.end > 0 && (
                 <time>
-                  {L("ends")} {new Date(b.end).toLocaleDateString(prefs.lang === "cs" ? "cs-CZ" : undefined, {
+                  {L("ends")} {new Date(b.end).toLocaleDateString(locale(), {
                     month: "short",
                     day: "numeric",
                     year: "numeric",

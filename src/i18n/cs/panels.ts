@@ -167,8 +167,8 @@ export default {
   "CelesTrak satellites": "CelesTrak · družice",
   "WHO · US travel advisories": "WHO · cestovní varování USA",
   "Local AI": "Místní AI",
-  "AI briefs come from aipro, the AI app on this computer — nothing is sent anywhere. Globe Now asks for qwen3:1.7b; aipro picks another local model when that one is missing. AI features stay off while aipro is not running and come back on their own within 30 s of it starting.":
-    "AI přehledy dodává aipro, AI aplikace na tomto počítači — nic se nikam neodesílá. Globe Now žádá model qwen3:1.7b; když chybí, aipro vybere jiný místní model. Funkce AI jsou vypnuté, dokud aipro neběží, a samy se zapnou do 30 s po jeho spuštění.",
+  "AI briefs come from aipro, the AI app on this computer — nothing is sent anywhere. aipro's default models write them and the translations — choose them in aipro. AI features stay off while aipro is not running and come back on their own within 30 s of it starting.":
+    "AI přehledy dodává aipro, AI aplikace na tomto počítači — nic se nikam neodesílá. Píší je i překlady výchozí modely aipro — vyberete je v aipro. Funkce AI jsou vypnuté, dokud aipro neběží, a samy se zapnou do 30 s po jeho spuštění.",
   "Keyboard": "Klávesnice",
   "Search everything": "Hledat všude",
   "Switch tabs": "Přepnout karty",
@@ -182,4 +182,6 @@ export default {
   "and": "a",
   "Map data: Wikidata (CC0) for bases, power plants, spaceports and data centers; NGA World Port Index; shipping lanes by newzealandpaul/Shipping-Lanes (CC BY 4.0).":
     "Mapová data: Wikidata (CC0) pro základny, elektrárny, kosmodromy a datová centra; NGA World Port Index; námořní trasy z newzealandpaul/Shipping-Lanes (CC BY 4.0).",
+  "Menus and live text (news, alerts, briefs) are translated by aipro on this computer the first time they are shown, then kept — it needs aipro running. Quality depends on the model and the language.":
+    "Nabídky i živý text (zprávy, výstrahy, shrnutí) přeloží aipro na tomto počítači při prvním zobrazení a uloží — musí běžet aipro. Kvalita závisí na modelu a jazyce.",
 } as Record<string, string>;

@@ -2,7 +2,9 @@
 import { type JSX, serverFn } from "aio";
 import type { reader } from "../server/reader.server.ts";
 import { useEffect, useInterval, useLocal } from "aio/air";
+import { ai } from "../cell/ai.ts";
 import { news } from "../cell/news.ts";
+import { tr } from "../cell/tr.ts";
 import { risk } from "../cell/risk.ts";
 import { view } from "../cell/view.ts";
 import { COUNTRIES } from "../data/countries.ts";
@@ -29,7 +31,8 @@ import {
   WeatherBody,
   when,
 } from "./Details.tsx";
-import { C, L, T } from "./i18n.ts";
+import { C, L, locale, T } from "./i18n.ts";
+import { attach, original, page, progress, retry } from "./pagetr.ts";
 import { Icon } from "./icons.tsx";
 import { focus, StoryRow } from "./rows.tsx";
 import * as P from "./pick.ts";
@@ -120,7 +123,7 @@ function Body(): JSX.Element {
                   onClick={() => focus({ kind: "outbreak", id: o.id })}
                 >
                   <span class="row-title one">{T(o.title)}</span>
-                  <time>{ago(o.at, now.value, prefs.lang === "cs")}</time>
+                  <time>{ago(o.at, now.value, prefs.lang)}</time>
                 </button>
               ))}
             </section>
@@ -136,7 +139,7 @@ function Body(): JSX.Element {
                   onClick={() => focus(h.pick)}
                 >
                   <span class="row-title one">{T(h.title)}</span>
-                  <time>{ago(h.at, now.value, prefs.lang === "cs")}</time>
+                  <time>{ago(h.at, now.value, prefs.lang)}</time>
                 </button>
               ))}
             </section>
@@ -207,7 +210,7 @@ function Body(): JSX.Element {
             rows={[
               [L("Type"), a.type || "—"],
               [L("Registration"), a.reg || "—"],
-              [L("Altitude"), a.alt ? `${a.alt.toLocaleString(L("en-US"))} ft` : L("On ground")],
+              [L("Altitude"), a.alt ? `${a.alt.toLocaleString(locale())} ft` : L("On ground")],
               [L("Speed"), `${a.spd} kt`],
               [L("Heading"), `${a.hdg}°`],
               [L("Squawk"), a.sq || "—"],
@@ -314,7 +317,7 @@ function SatBody(props: { id: string }): JSX.Element {
       <Facts
         rows={[
           ["NORAD ID", t.id],
-          [L("Altitude"), pos ? `${Math.round(pos.alt).toLocaleString(L("en-US"))} km` : "—"],
+          [L("Altitude"), pos ? `${Math.round(pos.alt).toLocaleString(locale())} km` : "—"],
           [L("Speed"), pos ? `${pos.speed.toFixed(2)} km/s` : "—"],
           [L("Orbit"), `${period(t).toFixed(0)} min`],
           [L("Position"), pos ? `${pos.lat.toFixed(2)}, ${pos.lon.toFixed(2)}` : "—"],
@@ -380,8 +383,46 @@ function Reader(props: { url: string }): JSX.Element {
           </header>
         )}
       {text === null
-        ? <webview ref={(el: HTMLElement | null) => el && load(el, props.url)} />
-        : <pre class="reader-text">{text}</pre>}
+        ? (
+          <>
+            {prefs.lang !== "en" && <TranslateBar />}
+            <webview
+              ref={(el: HTMLElement | null) => {
+                attach(el);
+                if (el) load(el, props.url);
+              }}
+            />
+          </>
+        )
+        : <pre class="reader-text">{text.split(/\n{2,}/).map((b) => T(b)).join("\n\n")}</pre>}
+    </div>
+  );
+}
+
+/** Czech mode: how far the in-page translation is, and a switch back to the page's own text. */
+function TranslateBar(): JSX.Element | null {
+  const p = page.value;
+  if (!p) return null;
+  const [done, all] = progress();
+  return (
+    <div class="reader-tr" t="reader_translate">
+      <span class={`fresh ${!ai.ready ? "err" : done < all ? "busy" : "ok"}`}>
+        <i />
+        {!ai.ready
+          ? L("Translation needs aipro")
+          : done < all
+          ? L("Translating {done}/{all}…", { done, all })
+          : L("Translated by aipro")}
+      </span>
+      <span class="grow" />
+      {ai.ready && done < all && p.asked && !tr.pending && (
+        <button type="button" class="link" onClick={retry}>{L("Try again")}</button>
+      )}
+      {done > 0 && (
+        <button type="button" class="link" onClick={() => original.set(!original.value)}>
+          {original.value ? L("Show translation") : L("Show original")}
+        </button>
+      )}
     </div>
   );
 }
