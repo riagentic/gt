@@ -13,6 +13,7 @@ export type Tab =
   | "bets"
   | "tv"
   | "layers"
+  | "ai"
   | "settings";
 export type LayerId =
   | "news"

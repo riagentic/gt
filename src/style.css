@@ -1,4 +1,4 @@
-/* Globe Now — macOS-grade chrome over a full-bleed WebGL map. */
+/* Globe Today — macOS-grade chrome over a full-bleed WebGL map. */
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
@@ -212,6 +212,25 @@ p {
 .tab.on {
   background: var(--sel);
   color: var(--accent-text);
+}
+/* AI tab while aipro writes a brief or translates for gt: its icon slowly cycles colour. */
+.tab.working {
+  animation: ai-work 4s ease-in-out infinite;
+}
+@keyframes ai-work {
+  0%,
+  100% {
+    color: #5aaeff;
+    filter: drop-shadow(0 0 3px #5aaeff80);
+  }
+  33% {
+    color: #bf5af2;
+    filter: drop-shadow(0 0 4px #bf5af280);
+  }
+  66% {
+    color: #ff6482;
+    filter: drop-shadow(0 0 4px #ff648280);
+  }
 }
 
 /* sidebar */
@@ -1804,6 +1823,15 @@ select optgroup {
 .aipro small {
   color: var(--fg3);
   font-size: 11px;
+}
+
+/* AI tab: one row per thing gt uses aipro for. */
+.ai-use {
+  padding: 7px 10px;
+}
+.ai-use small .err {
+  color: var(--down);
+  margin-left: 4px;
 }
 
 .reader-tr {

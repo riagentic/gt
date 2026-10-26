@@ -114,7 +114,7 @@ Deno.test("ai: aipro up → ready; brief streams, then stores a note per subject
   await using _ = await bootCells([ai], {
     stub: {
       "../server/ai.server.ts": {
-        capabilities: ok([{ task: "text", qualities: ["normal"], now: true, paidOnly: false }]),
+        capabilities: ok([{ task: "text.chat", qualities: ["normal"], now: true, paidOnly: false }]),
         brief: briefOf(
           [{ type: "progress", phase: "load", pct: 0.5 }, { type: "delta", text: "<think>hm</think>- " }],
           (m: { content: string }[]) => ({
@@ -159,7 +159,7 @@ Deno.test("ai: aipro answers map to the Settings status; a dropped link turns AI
   await using _ = await bootCells([ai], {
     stub: {
       "../server/ai.server.ts": {
-        capabilities: ok([{ task: "text", qualities: ["normal"], now: true, paidOnly: false }]),
+        capabilities: ok([{ task: "text.chat", qualities: ["normal"], now: true, paidOnly: false }]),
         brief: async function* () {
           yield { type: "delta", text: "- a" };
           throw new Error("closed");
@@ -170,4 +170,55 @@ Deno.test("ai: aipro answers map to the Settings status; a dropped link turns AI
   await ai.check();
   await ai.summarize("X", "XX", ["h"]);
   assertEquals([ai.ready, ai.last?.kind, ai.status.err], [false, "failed", "aipro connection lost: closed"]);
+});
+
+Deno.test("ai: a queued brief shows aipro's note and its id; Cancel stops it by that id, quietly", async () => {
+  const cancelled: string[] = [];
+  let stop!: () => void;
+  const stopped = new Promise<void>((r) => stop = r);
+  await using h = await bootCells([ai], {
+    stub: {
+      "../server/ai.server.ts": {
+        capabilities: ok([{ task: "text.chat", qualities: ["normal"], now: true, paidOnly: false }]),
+        cancel: (id: string) => (cancelled.push(id), stop(), Promise.resolve()),
+        brief: async function* () {
+          yield { type: "progress", phase: "queue", note: "2 ahead", pct: -1 };
+          await stopped;
+          return { v: 1, ok: false, kind: "failed", reason: "cancelled" };
+        },
+      },
+    },
+  });
+  await ai.check();
+  const run = ai.summarize("X", "XX", ["h"]);
+  await h.settle();
+  assertEquals([ai.live?.key, ai.live?.phase, ai.live?.note], ["XX", "queue", "2 ahead"]);
+  const id = ai.live!.id;
+  await ai.cancel();
+  await run;
+  assertEquals([cancelled, ai.live, ai.last, ai.status.err], [[id], null, null, ""]);
+});
+
+Deno.test("ai: the switch — off keeps aipro known but AI unusable (no brief is asked); on brings it back", async () => {
+  let asked = 0;
+  await using _ = await bootCells([ai], {
+    stub: {
+      "../server/ai.server.ts": {
+        capabilities: ok([{ task: "text.chat", qualities: ["normal"], now: true, paidOnly: false }]),
+        brief: (id: string, msgs: { content: string }[]) => {
+          asked++;
+          return briefOf([], { v: 1, ok: false, kind: "busy", reason: "busy" })(id, msgs);
+        },
+      },
+    },
+  });
+  await ai.check();
+  await ai.setOn(false);
+  assertEquals([ai.on, ai.up, ai.ready], [false, true, false]);
+  await ai.summarize("X", "XX", ["h"]);
+  assertEquals([ai.status.err, asked], ["AI is turned off", 0]);
+  await ai.check();
+  assertEquals(ai.ready, false);
+  await ai.setOn(true);
+  assertEquals(ai.ready, true);
 });

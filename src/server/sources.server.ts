@@ -2,6 +2,7 @@
 import { FEEDS } from "../data/feeds.ts";
 import { parseFeed } from "../lib/rss.ts";
 import * as intel from "../lib/intel.ts";
+import { cycloneSearch, ongoing } from "../lib/meteo.ts";
 import * as norm from "../lib/normalize.ts";
 import { dedupe, type Raw, type Story, toStories } from "../lib/stories.ts";
 import { analyze } from "./analyze.server.ts";
@@ -32,11 +33,12 @@ export async function news(now: number): Promise<{ stories: Story[]; failed: str
 }
 
 export async function hazards(): Promise<{ quakes: norm.Quake[]; events: norm.Hazard[] }> {
-  const [wk, day, eo, gd] = await Promise.allSettled([
+  const [wk, day, eo, gd, tc] = await Promise.allSettled([
     json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson"),
     json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson"),
     json("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30"),
     json("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP"),
+    json(cycloneSearch(Date.now())),
   ]);
   const val = <T>(
     r: PromiseSettledResult<unknown>,
@@ -45,7 +47,8 @@ export async function hazards(): Promise<{ quakes: norm.Quake[]; events: norm.Ha
   if ([wk, day, eo, gd].every((r) => r.status === "rejected")) throw new Error("hazard sources unreachable");
   const quakes = [...new Map([...val(wk, norm.quakes), ...val(day, norm.quakes)].map((q) => [q.id, q])).values()]
     .sort((a, b) => b.at - a.at);
-  const events = [...val(eo, norm.eonet), ...val(gd, norm.gdacs).filter((h) => h.kind !== "quake")]
+  const gdacs = [...val(gd, norm.gdacs), ...val(tc, (j) => norm.gdacs(ongoing(j)))].filter((h) => h.kind !== "quake");
+  const events = [...val(eo, norm.eonet), ...new Map(gdacs.map((h) => [h.id, h])).values()]
     .sort((a, b) => b.level - a.level || b.at - a.at).slice(0, 300);
   return { quakes, events };
 }

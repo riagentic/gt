@@ -176,12 +176,44 @@ export default {
   "Show / hide sidebar": "Zobrazit / skrýt postranní panel",
   "Close details": "Zavřít podrobnosti",
   "About": "O aplikaci",
-  "Globe Now runs entirely on this computer. No account, no tracking, no API keys.":
-    "Globe Now běží celý na tomto počítači. Žádný účet, žádné sledování, žádné API klíče.",
+  "Globe Today runs entirely on this computer. No account, no tracking, no API keys.":
+    "Globe Today běží celý na tomto počítači. Žádný účet, žádné sledování, žádné API klíče.",
   "{n} news feeds plus public data from": "{n} zpravodajských zdrojů a veřejná data z",
   "and": "a",
   "Map data: Wikidata (CC0) for bases, power plants, spaceports and data centers; NGA World Port Index; shipping lanes by newzealandpaul/Shipping-Lanes (CC BY 4.0).":
     "Mapová data: Wikidata (CC0) pro základny, elektrárny, kosmodromy a datová centra; NGA World Port Index; námořní trasy z newzealandpaul/Shipping-Lanes (CC BY 4.0).",
   "Menus and live text (news, alerts, briefs) are translated by aipro on this computer the first time they are shown, then kept — it needs aipro running. Quality depends on the model and the language.":
     "Nabídky i živý text (zprávy, výstrahy, shrnutí) přeloží aipro na tomto počítači při prvním zobrazení a uloží — musí běžet aipro. Kvalita závisí na modelu a jazyce.",
+  // AI tab
+  "AI": "AI",
+  "Use AI": "Používat AI",
+  "Briefs and translations by aipro, the AI app on this computer — nothing is sent anywhere.":
+    "Shrnutí a překlady od aipro, AI aplikace na tomto počítači — nic se nikam neodesílá.",
+  "AI is turned off": "AI je vypnutá",
+  "AI is turned off.": "AI je vypnutá.",
+  "Turn it on": "Zapnout",
+  "What Globe Today uses it for": "K čemu ji Globe Today používá",
+  "Briefs": "Shrnutí",
+  "World and country briefs from the headlines": "Shrnutí světa a zemí z titulků",
+  "Translation": "Překlad",
+  "Live text and opened pages, into the app's language": "Živé texty a otevřené stránky do jazyka aplikace",
+  "no model for this on aipro": "aipro na to nemá model",
+  "loaded": "načtený",
+  "on disk": "na disku",
+  "not downloaded": "nestažený",
+  "{gb} GPU": "{gb} GPU",
+  "not used yet": "zatím nepoužito",
+  "{n} requests": "požadavků: {n}",
+  "{ok} ok": "v pořádku: {ok}",
+  "{n} failed": "selhalo: {n}",
+  "{s} typical": "obvykle {s}",
+  "{n} texts kept": "uložených textů: {n}",
+  "{n} waiting": "čeká: {n}",
+  "Latest requests": "Poslední požadavky",
+  "queued": "ve frontě",
+  "active": "běží",
+  "done": "hotovo",
+  "cancelled": "zrušeno",
+  "aipro is optional: Globe Today works without it, with AI features off. It runs the models on this computer and shares them between apps; pick the models in aipro. AI comes back on its own within 30 s of aipro starting.":
+    "aipro je volitelné: Globe Today funguje i bez něj, jen bez funkcí AI. Spouští modely na tomto počítači a sdílí je mezi aplikacemi; modely vyberete v aipro. AI se sama zapne do 30 s po spuštění aipro.",
 } as Record<string, string>;

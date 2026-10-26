@@ -3,8 +3,8 @@ export default {
   // ai / tr cells (aipro link)
   "aipro is not running": "aipro neběží",
   "aipro has no local text model": "aipro nemá místní textový model",
-  "aipro is not running — start it for AI briefs":
-    "aipro neběží — spusťte ho, aby fungovala AI shrnutí",
+  "aipro is not running — start aipro for AI briefs and translations":
+    "aipro neběží — pro AI shrnutí a překlady spusťte aipro",
   // market quotes (server/sources.server.ts); tickers and index names stay
   "WTI Crude": "Ropa WTI",
   "Brent": "Ropa Brent",

@@ -3,7 +3,7 @@ import { cellToBoundary } from "h3-js";
 import { openBlobStore } from "aio/server";
 import { cables, jamming } from "./sources.server.ts";
 
-const store = openBlobStore("gn");
+const store = openBlobStore("gt");
 
 export async function put(json: string, name: string, previousUrl: string): Promise<string> {
   const info = await store.put(new TextEncoder().encode(json), { name });

@@ -108,6 +108,6 @@ export async function signals(now: number): Promise<Signals> {
     fed: f.status === "fulfilled" ? f.value : [],
     recession: r.status === "fulfilled" ? r.value : null,
   };
-  await Deno.writeTextFile(join(appDirs("gn").data, "signals.jsonl"), JSON.stringify(out) + "\n", { append: true });
+  await Deno.writeTextFile(join(appDirs("gt").data, "signals.jsonl"), JSON.stringify(out) + "\n", { append: true });
   return out;
 }

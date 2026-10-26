@@ -170,6 +170,11 @@ const DOTS: [LayerId, () => FC | null, Dot][] = [
  *  best, so a 4K window gains nothing but a longer freeze). */
 const rasterScale = (w: number, h: number) => Math.min(0.5, Math.sqrt(400_000 / (w * h)));
 
+/** Least room between two temperature values on a row (px): "−23°" at 10px is ~24px wide. */
+const TEMP_GAP = 30;
+/** Room a grid step needs on screen before it is shown (px): wider than TEMP_GAP, so the map does not fill up. */
+const TEMP_ROOM = 48;
+
 export function EqualMap(): JSX.Element {
   const host = useRef<HTMLCanvasElement>(null!);
   const tipRef = useRef<HTMLDivElement>(null!);
@@ -529,14 +534,20 @@ export function EqualMap(): JSX.Element {
           }
           if (m.pick) next.push({ x, y, r: m.r + 3, pick: m.pick, title: m.title, live: m.live });
         }
-        // Temperature values once zoomed in.
-        if (on.temps && temps.src && k >= 2.5) {
+        // Temperature values on the finest grid that fits this zoom (30°, 20°, 10°); a value still too close to the
+        // last one drawn on its row (meridians close in toward the poles) is left out.
+        if (on.temps && temps.src) {
+          const [a, b] = [screen(0, 0), screen(10, 0)];
+          const ten = a && b ? b[0] - a[0] : 0, step = ten >= TEMP_ROOM ? 10 : ten * 2 >= TEMP_ROOM ? 20 : 30;
           ctx.font = "10px system-ui, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
+          let row = NaN, lastX = -Infinity;
           M.GRID.forEach(([lat, lon], i) => {
             const v = temps.src!.t[i], s = screen(lon, lat);
-            if (v === null || !s) return;
+            if (lat !== row) [row, lastX] = [lat, -Infinity];
+            if (v === null || !s || lat % step !== 0 || lon % step !== 0 || s[0] - lastX < TEMP_GAP) return;
+            lastX = s[0];
             ctx.lineWidth = 3;
             ctx.strokeStyle = "#00000080";
             ctx.strokeText(`${Math.round(v)}°`, s[0], s[1]);
@@ -584,6 +595,26 @@ export function EqualMap(): JSX.Element {
         hits = next.reverse(); // topmost first
       });
 
+    // Defined before the effects below: the select effect runs at once, and a selection may already be open.
+    const flyTo = (p: Pick) => {
+      const at = locate(p), base = at && proj(at);
+      if (!base) return;
+      const left = prefs.sidebar ? (prefs.tab === "tv" && !prefs.tv.floating ? 752 : 412) : 72;
+      const right = view.pick ? 392 : 16;
+      const k1 = Math.max(k, p.kind === "country" ? 2 : 3);
+      const cx = left + (W - left - right) / 2, cy = H / 2;
+      const [k0, x0, y0] = [k, tx, ty];
+      const x1 = cx - base[0] * k1, y1 = cy - base[1] * k1, t0 = performance.now();
+      const step = (t: number) => {
+        const u = Math.min(1, (t - t0) / 450), e = 1 - (1 - u) ** 3;
+        [k, tx, ty] = [k0 + (k1 - k0) * e, x0 + (x1 - x0) * e, y0 + (y1 - y0) * e];
+        clamp();
+        draw();
+        if (u < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+
     // Redraw whenever anything drawn changes (each read inside subscribes).
     const disposers = [
       effect(() => void (buildMarks(), schedule())), // re-runs when a shown layer's data (or the layer mix) changes
@@ -627,25 +658,6 @@ export function EqualMap(): JSX.Element {
         if (p) untrack(() => flyTo(p));
       }),
     ];
-
-    const flyTo = (p: Pick) => {
-      const at = locate(p), base = at && proj(at);
-      if (!base) return;
-      const left = prefs.sidebar ? (prefs.tab === "tv" && !prefs.tv.floating ? 752 : 412) : 72;
-      const right = view.pick ? 392 : 16;
-      const k1 = Math.max(k, p.kind === "country" ? 2 : 3);
-      const cx = left + (W - left - right) / 2, cy = H / 2;
-      const [k0, x0, y0] = [k, tx, ty];
-      const x1 = cx - base[0] * k1, y1 = cy - base[1] * k1, t0 = performance.now();
-      const step = (t: number) => {
-        const u = Math.min(1, (t - t0) / 450), e = 1 - (1 - u) ** 3;
-        [k, tx, ty] = [k0 + (k1 - k0) * e, x0 + (x1 - x0) * e, y0 + (y1 - y0) * e];
-        clamp();
-        draw();
-        if (u < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    };
 
     // Interaction: wheel zoom about the cursor, drag to pan, click = pick, hover = name.
     const local = (e: MouseEvent): [number, number] => {

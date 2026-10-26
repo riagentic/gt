@@ -1,7 +1,7 @@
 // Small shared pieces: freshness dot, sparkline, section header, empty state.
 import type { JSX } from "aio";
 import { since } from "../lib/fmt.ts";
-import { ai } from "../cell/ai.ts";
+import { ai, type Live } from "../cell/ai.ts";
 import type { Status } from "../lib/status.ts";
 import { L } from "./i18n.ts";
 import { now } from "./store.ts";
@@ -23,19 +23,35 @@ export const Fresh = (props: { s: Status; stale: number }): JSX.Element => {
   );
 };
 
+/** What a brief waits on or does, before its text comes: its place in aipro's queue, else the phase (+ pct). */
+export const liveLine = (l: Live): string =>
+  l.phase === "queue"
+    ? `${L("waiting in aipro")}${l.note ? `: ${l.note}` : ""}`
+    : `${L(l.phase || "starting")}${l.pct >= 0 ? ` ${Math.round(l.pct * 100)}%` : ""}${l.note ? ` · ${l.note}` : ""}`;
+
 const TONE = { ok: "ok", busy: "stale", refused: "err", failed: "err" } as const;
 
-/** aipro link + how it answered the last brief, so the user can see why AI features are off. */
-export const AiproStatus = (): JSX.Element => {
+/** aipro link (and its version, when known) + how it answered the last brief, so the user can see why AI features
+ *  are off. */
+export const AiproStatus = (props: { version?: string }): JSX.Element => {
   const l = ai.last;
   return (
     <div class="aipro" t="aipro_status">
+      {!ai.on && (
+        <p>
+          <span class="fresh stale">
+            <i />
+            {L("AI is turned off")}
+          </span>
+        </p>
+      )}
       <p>
-        <span class={`fresh ${ai.link.busy ? "busy" : ai.ready ? "ok" : "err"}`}>
+        <span class={`fresh ${ai.link.busy ? "busy" : ai.up ? "ok" : "err"}`}>
           <i />
-          {ai.ready ? L("aipro running") : L("aipro not running")}
+          {ai.up ? L("aipro running") : L("aipro not running")}
+          {ai.up && props.version && ` · ${props.version}`}
         </span>
-        {!ai.ready && (
+        {!ai.up && (
           <>
             {ai.link.err && ai.link.err !== "aipro is not running" && <small>{L(ai.link.err)}</small>}
             <button type="button" class="link" onClick={() => ai.check()}>{L("Check again")}</button>
@@ -47,7 +63,7 @@ export const AiproStatus = (): JSX.Element => {
           ? (
             <span class="fresh busy">
               <i />
-              {L("Last request: working · {phase}", { phase: L(ai.live.phase || "starting") })}
+              {L("Last request: working · {phase}", { phase: liveLine(ai.live) })}
             </span>
           )
           : l

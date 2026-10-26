@@ -362,12 +362,13 @@ function install(
     id: "temps-label",
     type: "symbol",
     source: "temps-pts",
-    minzoom: 2.5,
+    // At every zoom, as many as fit without overlapping: the coarse grids first, so zoomed out it thins evenly.
     layout: {
       "text-field": ["get", "label"],
       "text-font": ["Noto Sans Regular"],
       "text-size": 10,
-      "text-allow-overlap": true,
+      "text-padding": 12,
+      "symbol-sort-key": ["get", "rank"],
     },
     paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0,0,0,0.55)", "text-halo-width": 1 },
   });

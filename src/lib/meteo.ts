@@ -59,18 +59,41 @@ export const tempColor = (t: number): readonly [number, number, number] =>
   TABLE[Math.max(0, Math.min(400, Math.round((t + 50) * 4)))];
 
 /** Grid points with a value, as labelled points ("23°"). */
+/** How coarse a grid point's grid is: 0 on the 30° grid, 1 on the 20° one, 2 only on the full 10° one. Zoomed out
+ *  the maps show the coarse grids first, zoomed in all of it. */
+export const tempRank = (lat: number, lon: number): 0 | 1 | 2 =>
+  lat % 30 === 0 && lon % 30 === 0 ? 0 : lat % 20 === 0 && lon % 20 === 0 ? 1 : 2;
+
 export const tempPoints = (t: (number | null)[]): GeoJSON.FeatureCollection => ({
   type: "FeatureCollection",
   features: GRID.flatMap(([lat, lon], i) =>
     t[i] === null ? [] : [{
       type: "Feature" as const,
-      properties: { t: t[i], label: `${Math.round(t[i]!)}°` },
+      properties: { t: t[i], label: `${Math.round(t[i]!)}°`, rank: tempRank(lat, lon) },
       geometry: { type: "Point" as const, coordinates: [lon, lat] },
     }]
   ),
 });
 
 // ── Tropical cyclones (GDACS) ─────────────────────────────────────────────
+const DAY = 86_400_000;
+const ymd = (t: number) => new Date(t).toISOString().slice(0, 10);
+
+/** GDACS's tropical cyclones of the last two weeks. Its app feed (EVENTS4APP) lists only the latest 100 events of any
+ *  kind, and earthquakes and fires fill it: cyclones never made it in. */
+export const cycloneSearch = (now: number): string =>
+  "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=TC" +
+  `&fromdate=${ymd(now - 14 * DAY)}&todate=${ymd(now + DAY)}&alertlevel=green;orange;red`;
+
+/** A GDACS event list cut to the events still going. */
+// deno-lint-ignore no-explicit-any
+export const ongoing = (j: any): unknown => ({
+  ...j,
+  // deno-lint-ignore no-explicit-any
+  features: (j?.features ?? []).filter((f: any) =>
+    f?.properties?.iscurrent === true || f?.properties?.iscurrent === "true"
+  ),
+});
 export type Storm = { id: string; name: string; level: "Green" | "Orange" | "Red"; lon: number; lat: number };
 export type StormPart = "cone" | "wind" | "track";
 

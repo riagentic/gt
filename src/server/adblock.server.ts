@@ -14,7 +14,7 @@ const MAX_FEATURES = 20_000;
 
 /** The engine, from the week-old cache or freshly built from the lists. */
 const load = async (): Promise<FiltersEngine> => {
-  const file = `${appDirs("gn").cache}/adblock.bin`;
+  const file = `${appDirs("gt").cache}/adblock.bin`;
   const at = await Deno.stat(file).then((s) => s.mtime?.getTime() ?? 0, () => 0);
   if (Date.now() - at < WEEK) {
     try {
@@ -22,7 +22,7 @@ const load = async (): Promise<FiltersEngine> => {
     } catch { /* a cache from another engine version: build anew */ }
   }
   const engine = await FiltersEngine.fromPrebuiltFull(fetch);
-  await Deno.mkdir(appDirs("gn").cache, { recursive: true });
+  await Deno.mkdir(appDirs("gt").cache, { recursive: true });
   await Deno.writeFile(file, engine.serialize());
   return engine;
 };

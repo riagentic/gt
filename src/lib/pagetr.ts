@@ -8,22 +8,22 @@ export const MAX_BLOCKS = 200;
 
 /** Put every translated block back to its own HTML. */
 const restore = `for (const [i, h] of Object.entries(window.__gn ?? {})) {
-    const e = document.querySelector('[data-gn="' + i + '"]');
+    const e = document.querySelector('[data-gt="' + i + '"]');
     if (e) e.innerHTML = h;
   }
   window.__gn = {};`;
 
-/** Undo any earlier translation, tag each readable block `data-gn=<i>`, answer their texts in page order. */
+/** Undo any earlier translation, tag each readable block `data-gt=<i>`, answer their texts in page order. */
 export const COLLECT = `(() => {
   ${restore}
   const out = [];
   for (const e of document.querySelectorAll(${JSON.stringify(BLOCK)})) {
     if (out.length >= ${MAX_BLOCKS}) break;
-    e.removeAttribute("data-gn");
+    e.removeAttribute("data-gt");
     if (e.closest(${JSON.stringify(SKIP)}) || e.querySelector(${JSON.stringify(BLOCK)})) continue;
     const t = (e.innerText ?? e.textContent ?? "").replace(/\\s+/g, " ").trim();
     if (t.length < 2 || t.length > 4000 || !/\\p{L}/u.test(t)) continue;
-    e.setAttribute("data-gn", String(out.length));
+    e.setAttribute("data-gt", String(out.length));
     out.push(t);
   }
   return out;
@@ -34,7 +34,7 @@ export const apply = (m: Record<number, string>): string =>
   `((m) => {
   const s = (window.__gn ??= {});
   for (const i in m) {
-    const e = document.querySelector('[data-gn="' + i + '"]');
+    const e = document.querySelector('[data-gt="' + i + '"]');
     if (!e) continue;
     if (!(i in s)) s[i] = e.innerHTML;
     e.textContent = m[i];

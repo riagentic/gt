@@ -26,6 +26,8 @@ export default {
   "check again": "zkontrolujte znovu",
   "No headlines to summarize yet.": "Zatím nejsou titulky ke shrnutí.",
   "starting": "spouštím",
+  "waiting in aipro": "čeká v aipro",
+  "Cancel": "Zrušit",
   "from headlines only — verify.": "jen z titulků — ověřte si to.",
   "Instability": "Nestabilita",
   "Profile": "Profil",

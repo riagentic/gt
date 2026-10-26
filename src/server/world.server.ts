@@ -172,6 +172,7 @@ const STATUS_PAGES: [string, string][] = [
   ["DigitalOcean", "https://status.digitalocean.com"],
   ["Vercel", "https://www.vercel-status.com"],
   ["npm", "https://status.npmjs.org"],
+  ["Solana", "https://status.solana.com"],
 ];
 
 export async function services(): Promise<W.Service[]> {
@@ -286,7 +287,7 @@ export async function temps(now: number): Promise<M.Temps> {
 
 /** Current tropical cyclones + their geometry, stored as one blob; returns the list and the blob URL. */
 export async function cyclones(previousUrl: string): Promise<{ storms: M.Storm[]; url: string }> {
-  const list = M.storms(await json("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP"));
+  const list = M.storms(await json(M.cycloneSearch(Date.now())));
   const res = await pool(list, 3, async (s) => {
     const [, eventid, episodeid] = s.id.split("-");
     return M.stormGeometry(

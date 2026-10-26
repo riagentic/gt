@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import * as S from "../src/lib/signals.ts";
+import * as M from "../src/lib/meteo.ts";
 
 const H = 3_600_000;
 
@@ -81,4 +82,15 @@ Deno.test("tv: live video id only when on air and embeddable", async () => {
   assertEquals(liveVideo(live), "pykpO5kQJ98");
   assertEquals(liveVideo(live + `"playableInEmbed":false`), null);
   assertEquals(liveVideo(`<link rel="canonical" href="https://www.youtube.com/channel/UCx">`), null);
+});
+
+Deno.test("meteo: cyclones come from GDACS's cyclone search (two weeks back), cut to the ones still going", () => {
+  const url = M.cycloneSearch(Date.UTC(2026, 9, 24));
+  assertEquals(url.includes("eventlist=TC") && url.includes("fromdate=2026-10-10&todate=2026-10-25"), true);
+  const list = { features: [{ properties: { iscurrent: "true" } }, { properties: { iscurrent: false } }] };
+  assertEquals((M.ongoing(list) as typeof list).features.length, 1);
+});
+
+Deno.test("meteo: temperature grid levels — 30° points first, then 20°, then the rest", () => {
+  assertEquals([M.tempRank(30, 60), M.tempRank(20, -160), M.tempRank(10, 10), M.tempRank(0, 0)], [0, 1, 2, 0]);
 });

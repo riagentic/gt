@@ -445,13 +445,11 @@ export function Settings(): JSX.Element {
         <h3>
           {L("Local AI")}
           <span class="grow" />
+          <button type="button" class="link" t="ai_details" onClick={() => prefs.setTab("ai")}>
+            {L("Details")}
+          </button>
         </h3>
         <AiproStatus />
-        <p class="fine">
-          {L(
-            "AI briefs come from aipro, the AI app on this computer — nothing is sent anywhere. aipro's default models write them and the translations — choose them in aipro. AI features stay off while aipro is not running and come back on their own within 30 s of it starting.",
-          )}
-        </p>
       </section>
       <section>
         <h3>{L("Keyboard")}</h3>
@@ -471,7 +469,7 @@ export function Settings(): JSX.Element {
       <section>
         <h3>{L("About")}</h3>
         <p class="fine">
-          {L("Globe Now runs entirely on this computer. No account, no tracking, no API keys.")}{" "}
+          {L("Globe Today runs entirely on this computer. No account, no tracking, no API keys.")}{" "}
           {L("{n} news feeds plus public data from", { n: FEEDS.length })}{" "}
           USGS, NASA EONET, GDACS, NWS, Environment Canada, WMO, adsb.lol, FAA, Tzeva Adom, GDELT, Yahoo Finance,
           CoinGecko, CNN, US Treasury, New York Fed, ECB, CFTC, Polymarket, Kalshi, TeleGeography, CelesTrak,

@@ -22,7 +22,7 @@ Deno.test("pagetr: apply swaps text (as text, not HTML); restore and re-collect 
   const { w, run } = page();
   run(COLLECT);
   run(apply({ 1: "Lety <b>zrušeny</b>." }));
-  const p = w.document.querySelector('[data-gn="1"]')!;
+  const p = w.document.querySelector('[data-gt="1"]')!;
   assertEquals([p.textContent, p.querySelector("b")], ["Lety <b>zrušeny</b>.", null]);
   run(RESTORE);
   assertEquals(p.querySelector("a")?.textContent, "cancelled");

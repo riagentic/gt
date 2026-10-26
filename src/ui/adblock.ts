@@ -10,7 +10,7 @@ const api = serverFn<typeof adblock>("adblock");
 /** After the page loads, look again for ads that come late (ms). */
 const LATER = [3_000, 10_000];
 /** Sites whose scripts already ran here (host → when), kept a month. */
-const PRIMED = "gn.adblock.primed", MONTH = 30 * 24 * 3600_000;
+const PRIMED = "gt.adblock.primed", MONTH = 30 * 24 * 3600_000;
 
 const primed = (): Record<string, number> => {
   try {

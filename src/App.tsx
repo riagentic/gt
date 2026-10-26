@@ -2,9 +2,12 @@
 import type { JSX } from "aio";
 import { onGlobalKey, onMount, onWindowEvent, useInterval } from "aio/air";
 import cfg from "../deno.json" with { type: "json" };
+import { ai } from "./cell/ai.ts";
 import { prefs, type Projection, PROJECTIONS, type Tab } from "./cell/prefs.ts";
+import { tr } from "./cell/tr.ts";
 import { view } from "./cell/view.ts";
 import { Icon, type IconName } from "./ui/icons.tsx";
+import { Ai } from "./ui/Ai.tsx";
 import { Inspector } from "./ui/Inspector.tsx";
 import { EqualMap } from "./ui/EqualMap.tsx";
 import { MapView } from "./ui/Map.tsx";
@@ -29,8 +32,29 @@ const TABS: { id: Tab; icon: IconName; label: string; panel: () => JSX.Element }
   { id: "bets", icon: "bets", label: "Predictions", panel: Bets },
   { id: "tv", icon: "tv", label: "Live TV", panel: Tv },
   { id: "layers", icon: "layers", label: "Layers", panel: Layers },
+  { id: "ai", icon: "sparkle", label: "AI", panel: Ai },
   { id: "settings", icon: "settings", label: "Settings", panel: Settings },
 ];
+
+/** Tabs at the foot of the rail, after Search: the app's own, not the world's. */
+const BOTTOM = new Set<Tab>(["ai", "settings"]);
+
+const railTab = (t: (typeof TABS)[number]): JSX.Element => (
+  <button
+    type="button"
+    key={t.id}
+    aria-label={L(t.label)}
+    title={L(t.label)}
+    class={[
+      "tab",
+      prefs.sidebar && prefs.tab === t.id && "on",
+      t.id === "ai" && (ai.status.busy || tr.status.busy) && "working",
+    ].filter(Boolean).join(" ")}
+    onClick={() => prefs.setTab(t.id)}
+  >
+    <Icon name={t.icon} size={19} />
+  </button>
+);
 
 type AioWindow = { close(): void; minimize(): void; maximize(): void };
 
@@ -112,18 +136,7 @@ export default function App(): JSX.Element {
       <div class="drag" />
       <nav class="rail" aria-label={L("Sections")}>
         <Lights />
-        {TABS.slice(0, -1).map((t) => (
-          <button
-            type="button"
-            key={t.id}
-            aria-label={L(t.label)}
-            title={L(t.label)}
-            class={prefs.sidebar && prefs.tab === t.id ? "tab on" : "tab"}
-            onClick={() => prefs.setTab(t.id)}
-          >
-            <Icon name={t.icon} size={19} />
-          </button>
-        ))}
+        {TABS.filter((t) => !BOTTOM.has(t.id)).map(railTab)}
         <span class="grow" />
         <button
           type="button"
@@ -134,15 +147,7 @@ export default function App(): JSX.Element {
         >
           <Icon name="search" size={19} />
         </button>
-        <button
-          type="button"
-          aria-label={L("Settings")}
-          title={L("Settings")}
-          class={prefs.sidebar && prefs.tab === "settings" ? "tab on" : "tab"}
-          onClick={() => prefs.setTab("settings")}
-        >
-          <Icon name="settings" size={19} />
-        </button>
+        {TABS.filter((t) => BOTTOM.has(t.id)).map(railTab)}
       </nav>
       <aside
         class={`sidebar${prefs.sidebar ? " open" : ""}${prefs.tab === "tv" && !prefs.tv.floating ? " wide" : ""}`}
@@ -155,7 +160,7 @@ export default function App(): JSX.Element {
       <TvFloat />
       <div class={`mapbar${view.pick || view.page ? " shifted" : ""}${view.page ? " wide" : ""}`}>
         <div class="brand" aria-hidden="true">
-          <b>globe now {cfg.version}</b>
+          <b>globe today {cfg.version}</b>
           <span>{L("built with aio")}</span>
           <span>{L("by riagentic")}</span>
         </div>

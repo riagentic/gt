@@ -1,4 +1,4 @@
-// Globe Now (gn) — entry. Cells self-register on import.
+// Globe Today (gt) — entry. Cells self-register on import.
 import "./cell/prefs.ts";
 import "./cell/view.ts";
 import "./cell/watch.ts";
@@ -10,6 +10,7 @@ import "./server/ai.server.ts";
 import "./server/signals.server.ts";
 import "./server/reader.server.ts";
 import "./server/adblock.server.ts";
+import "./server/ai.server.ts";
 import { aio } from "aio";
 import { ai } from "./cell/ai.ts";
 import { air } from "./cell/air.ts";
@@ -30,7 +31,7 @@ const MIN = 60_000;
 // aio-ok: single-user local app; every window reads every cell.
 await aio.run({
   ui: {
-    title: "Globe Now",
+    title: "Globe Today",
     theme: "tokens",
     head: `<link rel="stylesheet" href="assets/maplibre-gl.css">`,
     chrome: "none",

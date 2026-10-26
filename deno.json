@@ -1,7 +1,7 @@
 {
-  "appId": "gn",
-  "title": "Globe Now",
-  "aioVersion": "v1.0.24-beta",
+  "appId": "gt",
+  "title": "Globe Today",
+  "aioVersion": "v1.0.25-beta",
   "version": "0.1",
   "client": "electron",
   "build": {

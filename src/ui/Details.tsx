@@ -11,7 +11,7 @@ import { compact, since as since_ } from "../lib/fmt.ts";
 import { prefs } from "../cell/prefs.ts";
 import { EURO } from "../lib/world.ts";
 import { band, type Instability } from "../lib/score.ts";
-import { Empty } from "./bits.tsx";
+import { Empty, liveLine } from "./bits.tsx";
 import { Icon } from "./icons.tsx";
 import { C, L, locale, T } from "./i18n.ts";
 import { focus, StoryRow } from "./rows.tsx";
@@ -113,19 +113,33 @@ export function AiBrief(props: { subject: string; id: string; headlines: string[
             {busy ? L("Writing…") : note ? L("Refresh") : L("Write brief")}
           </button>
         )}
+        {live && (
+          <button type="button" class="link" t={`ai_cancel_${props.id}`} onClick={() => ai.cancel()}>
+            {L("Cancel")}
+          </button>
+        )}
       </h3>
       {!ready && (
         <p class="fine">
-          {L("AI is off: {why}.", { why: L(ai.link.err || "aipro is not running") })}{" "}
-          {L("Briefs come from aipro, the local AI app. Start it, then")}{" "}
-          <button type="button" class="link" onClick={() => ai.check()}>{L("check again")}</button>.
+          {ai.on
+            ? (
+              <>
+                {L("AI is off: {why}.", { why: L(ai.link.err || "aipro is not running") })}{" "}
+                {L("Briefs come from aipro, the local AI app. Start it, then")}{" "}
+                <button type="button" class="link" onClick={() => ai.check()}>{L("check again")}</button>.
+              </>
+            )
+            : (
+              <>
+                {L("AI is turned off.")}{" "}
+                <button type="button" class="link" onClick={() => prefs.setTab("ai")}>{L("Turn it on")}</button>
+              </>
+            )}
         </p>
       )}
       {ready && props.headlines.length === 0 && <Empty text={L("No headlines to summarize yet.")} />}
       {live
-        ? (live.text
-          ? <Md text={live.text} />
-          : <p class="fine">{live.phase || L("starting")}{live.pct >= 0 ? ` ${Math.round(live.pct * 100)}%` : ""}…</p>)
+        ? (live.text ? <Md text={live.text} /> : <p class="fine">{liveLine(live)}…</p>)
         : note && <Md text={T(note.text)} />}
       {!live && note && (
         <p class="fine">
