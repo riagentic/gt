@@ -30,6 +30,21 @@ const STYLE = {
   dark: "https://tiles.openfreemap.org/styles/dark",
   light: "https://tiles.openfreemap.org/styles/positron",
 };
+/** Base-map place and water names in the UI language, else English, else the local name — one script, not two. */
+const nameIn = (lang: string): unknown[] => [
+  "coalesce",
+  ...[...new Set([lang, lang.split("-")[0], "en"])].map((l) => ["get", `name:${l}`]),
+  ["get", "name_en"],
+  ["get", "name:latin"],
+  ["get", "name"],
+];
+const applyNames = (map: maplibregl.Map, lang: string) => {
+  for (const l of map.getStyle().layers) {
+    if (l.type === "symbol" && l.source === "openmaptiles" && /^(place|water_name)$/.test(l["source-layer"] ?? "")) {
+      map.setLayoutProperty(l.id, "text-field", nameIn(lang));
+    }
+  }
+};
 const SOURCES = [
   "countries",
   "night",
@@ -860,6 +875,7 @@ export function MapView(): JSX.Element {
     );
     map.on("style.load", () => {
       install(map, data, dark, extra);
+      applyNames(map, untrack(() => prefs.lang));
       ready = true;
       applyProjection();
       applyLayers();
@@ -1018,6 +1034,10 @@ export function MapView(): JSX.Element {
       dark = isDark.value;
       ready = false;
       map.setStyle(STYLE[dark ? "dark" : "light"]);
+    });
+    watch(() => {
+      const lang = prefs.lang;
+      if (ready) applyNames(map, lang);
     });
 
     // interaction

@@ -17,3 +17,6 @@ release-key.json
 
 # Rust build output
 wasm/target/
+
+# Local reference material, never shipped
+untracked/

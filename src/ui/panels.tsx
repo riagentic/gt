@@ -25,6 +25,9 @@ import { Icon } from "./icons.tsx";
 import { focus, MIN, picked, PickRow, QuoteRow, StoryRow } from "./rows.tsx";
 import { AiBrief } from "./Details.tsx";
 import { matches, now, unstable } from "./store.ts";
+import cfg from "../../deno.json" with { type: "json" };
+
+const REPO = "https://github.com/riagentic/gt";
 
 const CLOCKS: [string, string][] = [
   ["UTC", "UTC"],
@@ -468,6 +471,15 @@ export function Settings(): JSX.Element {
       </section>
       <section>
         <h3>{L("About")}</h3>
+        <p class="fine">
+          <b>Globe Today {cfg.version}</b> · © 2026 riagentic · {L("MIT License")} ·{" "}
+          <a href={REPO} target="_blank" rel="noreferrer">{L("Source code")}</a>
+        </p>
+        <p class="fine">
+          {L(
+            "Data comes as is from the public sources below and can be late, incomplete or wrong. Not for safety decisions: follow official warnings.",
+          )}
+        </p>
         <p class="fine">
           {L("Globe Today runs entirely on this computer. No account, no tracking, no API keys.")}{" "}
           {L("{n} news feeds plus public data from", { n: FEEDS.length })}{" "}

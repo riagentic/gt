@@ -1,39 +1,51 @@
-# Globe Today (gt)
+# Globe Today
 
-A local desktop dashboard of what is happening in the world: news, disasters, severe weather, sirens, protests,
-aircraft, ship traffic, infrastructure, markets and prediction odds on one WebGL globe, plus live TV and local AI
-briefs. Free, keyless, no account, no backend.
+What is happening in the world, on one 3D globe: news, disasters, severe weather, sirens, protests, military aircraft,
+shipping, infrastructure, markets and prediction odds, plus live TV and optional local AI briefs.
+
+Free. No account, no API keys, no tracking, no backend — it runs on your computer and reads public sources directly.
+
+![Globe Today](docs/screenshot.png)
+
+## Features
+
+- 🌍 Globe, flat map and true-size (Equal Earth) map; country instability index; travel advisories
+- 📰 59 news feeds clustered into stories; watchlists that alert on keywords
+- ⚠️ Earthquakes, cyclones, floods, fires, weather warnings, rocket sirens, aviation emergencies, GPS jamming
+- 📈 Markets, crypto, rates, central banks, Polymarket and Kalshi odds, market signals
+- 📺 Live TV channels; reader that hides ads and cookie walls
+- 🤖 AI briefs and translation into 40 languages through [aipro](#local-ai), a local AI app (optional)
 
 ## Run
 
-    deno task dev                      # Electron window, live reload
-    deno task compile                  # → dist/globe-today-<ver>-x86_64.AppImage
-    deno task test                     # 51 tests: pure libs, every cell method, UI flows, WASM
-    deno task infra                    # rebuild assets/infra.geojson + lanes.geojson (Wikidata, NGA WPI)
+Needs [Deno](https://deno.com) ≥ 2.9 and [aio](https://github.com/riagentic/aio) (`am`).
 
-## Layout
+    git clone https://github.com/riagentic/gt && cd gt
+    am fix              # links aio, installs Electron
+    deno task dev       # opens the app
+    deno task compile   # → dist/globe-today-<version>-x86_64.AppImage
+    deno task test
 
-| Path          | What                                                                                                |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `src/cell/`   | State. Data cells refresh on `aio.run` schedules; `prefs` and `view` drive the UI                   |
-| `src/server/` | Network I/O (`sources.server.ts`, `world.server.ts`), local AI (`ai.server.ts`), blobs, WASM bridge |
-| `src/lib/`    | Pure functions: RSS parsing, normalizers, clustering, scoring, sun                                  |
-| `src/ui/`     | AIR components; `Map.tsx` = MapLibre (globe ⇄ flat)                                                 |
-| `src/data/`   | Feeds, gazetteer aliases, chokepoints and flashpoints, countries (generated)                        |
-| `wasm/`       | Rust core: headline geotagging (Aho-Corasick) and clustering. `deno task wasm` rebuilds `src/wasm/` |
-| `assets/`     | Natural Earth countries, baked infrastructure + shipping lanes (`deno task infra`), MapLibre CSS    |
+App data lives in `~/.gt`.
 
-## Sources (all keyless)
+## Local AI
 
-- News: 55 RSS feeds (incl. tech, Reddit, Hacker News, good news) · GDELT protests
-- Hazards: USGS · NASA EONET · GDACS · NWS · Environment Canada · WMO · WHO · Safecast · Open-Meteo ERA5 · NOAA CO₂ ·
-  ReliefWeb · ECDC
-- Security: adsb.lol (military, squawk 7500/7600/7700) · FAA airport status · Tzeva Adom sirens · gpsjam.org · CelesTrak
-  · US State Dept advisories
-- Money: BIS central bank rates · IMF outlook · Yahoo Finance · CoinGecko · alternative.me · CNN Fear & Greed · US
-  Treasury · NY Fed · ECB · CFTC · Polymarket · Kalshi
-- Context: World Bank · UNHCR · OFAC · IMF PortWatch · Statuspage feeds · Element 84 Sentinel-2 · TeleGeography
-- Baked map data: Wikidata (CC0) bases, nuclear plants, spaceports, data centers · NGA World Port Index ·
-  newzealandpaul/Shipping-Lanes (CC BY 4.0) · Natural Earth
-- Live TV: YouTube embeds in a `<webview>` (an `aio://` page sends no Referer; YouTube refuses with error 153)
-- AI briefs: through [aipro](../../aipro), the local AI provider app (aio `peer`); nothing leaves the machine.
+Briefs and translations come from aipro, an aio app that runs AI models on your computer. Without it Globe Today works
+fully; AI features just stay off. Nothing is sent to a cloud AI.
+
+## Sources
+
+All keyless and public: USGS, NASA EONET, GDACS, NWS, Environment Canada, WMO, WHO, ReliefWeb, ECDC, Safecast,
+Open-Meteo (ERA5), NOAA, adsb.lol, FAA, Tzeva Adom, gpsjam.org, CelesTrak, GDELT, US State Department, World Bank,
+UNHCR, OFAC, IMF, IMF PortWatch, BIS, Yahoo Finance, CoinGecko, CNN, US Treasury, NY Fed, ECB, CFTC, Polymarket, Kalshi,
+TeleGeography, Element 84 (Sentinel-2) and the RSS feeds in `src/data/feeds.ts`.
+
+Map: [OpenFreeMap](https://openfreemap.org) © OpenMapTiles, data © OpenStreetMap contributors · Natural Earth · Wikidata
+(CC0) · NGA World Port Index · [newzealandpaul/Shipping-Lanes](https://github.com/newzealandpaul/Shipping-Lanes) (CC BY
+4.0).
+
+Data is shown as is and can be late or wrong. Not for safety decisions — follow official warnings.
+
+## License
+
+[MIT](LICENSE) © 2026 riagentic

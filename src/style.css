@@ -1167,6 +1167,9 @@ kbd {
   font-size: 10px;
   color: var(--fg2);
 }
+.maplibregl-ctrl-attrib-inner {
+  color: var(--fg2);
+}
 .maplibregl-ctrl-attrib a {
   color: var(--fg3) !important;
 }

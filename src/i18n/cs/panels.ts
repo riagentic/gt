@@ -178,6 +178,10 @@ export default {
   "About": "O aplikaci",
   "Globe Today runs entirely on this computer. No account, no tracking, no API keys.":
     "Globe Today běží celý na tomto počítači. Žádný účet, žádné sledování, žádné API klíče.",
+  "MIT License": "Licence MIT",
+  "Source code": "Zdrojový kód",
+  "Data comes as is from the public sources below and can be late, incomplete or wrong. Not for safety decisions: follow official warnings.":
+    "Data přebíráme tak, jak jsou, z níže uvedených veřejných zdrojů a mohou být opožděná, neúplná nebo chybná. Nejsou určena k rozhodování o bezpečnosti: řiďte se oficiálními varováními.",
   "{n} news feeds plus public data from": "{n} zpravodajských zdrojů a veřejná data z",
   "and": "a",
   "Map data: Wikidata (CC0) for bases, power plants, spaceports and data centers; NGA World Port Index; shipping lanes by newzealandpaul/Shipping-Lanes (CC BY 4.0).":

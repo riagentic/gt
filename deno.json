@@ -2,7 +2,7 @@
   "appId": "gt",
   "title": "Globe Today",
   "aioVersion": "v1.0.25-beta",
-  "version": "0.1",
+  "version": "1.0",
   "client": "electron",
   "build": {
     "targets": [
@@ -18,6 +18,9 @@
   "android": {
     "colorScheme": "system"
   },
+  "exclude": [
+    "untracked/"
+  ],
   "fmt": {
     "exclude": [
       ".katana/",
