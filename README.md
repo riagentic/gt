@@ -28,6 +28,8 @@ Needs [Deno](https://deno.com) ≥ 2.9 and [aio](https://github.com/riagentic/ai
 
 App data lives in `~/.gt`.
 
+**Tests:** 82 (`deno task test`), all passing on Linux. Run locally; there is no CI yet.
+
 ## Local AI
 
 Briefs and translations come from aipro, an aio app that runs AI models on your computer. Without it Globe Today works
